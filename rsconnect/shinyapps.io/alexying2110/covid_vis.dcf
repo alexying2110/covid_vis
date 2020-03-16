@@ -5,6 +5,8 @@ account: alexying2110
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 1952747
-bundleId: 2885176
+bundleId: 2887158
 url: https://alexying2110.shinyapps.io/covid_vis/
-when: 1584330960.92543
+when: 1584376881.6262
+asMultiple: FALSE
+asStatic: FALSE
