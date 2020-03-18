@@ -2,10 +2,12 @@ library(shiny)
 library(leaflet)
 library(dplyr)
 library(leaflet.extras)
+library(DT)
+library(ggplot2)
 
 library(rsconnect)
 
-#setwd("/home/lofatdairy/code/sialab/covid_vis")
+setwd("/home/lofatdairy/code/sialab/covid_vis")
 
 confirmed <- read.csv("./csse_data/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Confirmed.csv")
 deaths <- read.csv("./csse_data/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Deaths.csv")
@@ -17,6 +19,8 @@ data = confirmed %>%
 
 today <- read.csv("./csse_data/csse_covid_19_data/csse_covid_19_daily_reports/03-15-2020.csv")
 
+hospitals <- read.csv("./our_data/US/hospitals.csv")
+
 ui <- fluidPage(
   fluidRow(
     sidebarLayout(
@@ -25,8 +29,8 @@ ui <- fluidPage(
           "Date",
           "Dates:",
           min = as.Date("2020-01-22","%Y-%m-%d"),
-          max = as.Date("2020-03-15","%Y-%m-%d"),
-          value = as.Date("2020-03-15","%Y-%m-%d"),
+          max = as.Date("2020-03-17","%Y-%m-%d"),
+          value = as.Date("2020-03-17","%Y-%m-%d"),
           timeFormat="%m-%d-%Y",
           animate = (animationOptions(interval = 500, loop = T))
         )
@@ -37,6 +41,7 @@ ui <- fluidPage(
     )
   ),
   fluidRow(
+    h1("Click row to display time curves"),
     column(12, DT::dataTableOutput('tbl')),
   ), 
   fluidRow(
@@ -51,9 +56,14 @@ server <- function(input, output, session) {
   pal <- colorBin(colorRamp(c("#FFBB00","#FF0000"), interpolate = "linear"), domain = c(0:1), bins = 10)
   
   output$mymap <- renderLeaflet({
-    leaflet(data) %>%
+    leaflet() %>%
+      addProviderTiles(providers$CartoDB.DarkMatterNoLabels) %>%
       setView(lng = 0, lat = 0, zoom = 1.5) %>%
-      addProviderTiles(providers$CartoDB.DarkMatterNoLabels)
+      addCircleMarkers(data = hospitals, lng = ~X, lat = ~Y, radius = 10, group = "hospitals") %>%
+      addLayersControl(
+        overlayGroups = c("hospitals"),
+        options = layersControlOptions(collapsed = FALSE)
+      )
   })
   
   observeEvent(input$Date, {
@@ -134,5 +144,3 @@ server <- function(input, output, session) {
     }
   })
 }
-
-shinyApp(ui, server)
