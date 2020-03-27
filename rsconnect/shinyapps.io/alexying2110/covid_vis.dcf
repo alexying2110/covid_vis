@@ -1,0 +1,12 @@
+name: covid_vis
+title:
+username:
+account: alexying2110
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 1952747
+bundleId: 2887169
+url: https://alexying2110.shinyapps.io/covid_vis/
+when: 1584377113.20101
+asMultiple: FALSE
+asStatic: FALSE
