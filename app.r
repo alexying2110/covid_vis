@@ -7,18 +7,24 @@ library(DT)
 library(data.table)
 library(ggplot2)
 library(rsconnect)
+library(profvis)
 
 hospitals <- read.csv("./our_data/US/hospitals.csv")
 
-counties <- readOGR("our_data/US/counties_low.json")
-states <- readOGR("our_data/US/states.json")
-
-stateNames <- setNames(as.list(as.character(states$NAME)), states$STATE)
-
-data <- fread("csse_data/csse_covid_19_data/csse_covid_19_daily_reports/03-24-2020.csv")
-data <- data[data$Country_Region == "US"]
-
-counties$STATENAME <- sapply(counties$STATE, function(x) {stateNames[[as.character(x)]]})
+setwd("/home/lofatdairy/code/sialab/covid_vis")
+time <- Sys.time()
+counties <- readOGR("our_data/US/counties.json")
+print(Sys.time() - time)
+# states <- readOGR("our_data/US/states.json")
+# 
+# stateNames <- setNames(as.list(as.character(states$NAME)), states$STATE)
+# 
+# data <- fread("csse_data/csse_covid_19_data/csse_covid_19_daily_reports/03-24-2020.csv")
+# data <- data[data$Country_Region == "US"]
+# 
+# counties$STATENAME <- sapply(counties$STATE, function(x) {stateNames[[as.character(x)]]})
+# 
+# writeOGR(counties, "./our_data/US/counties.json", layer = "counties_low", driver="GeoJSON")
 
 counties$cases <- mapply(function(x, y) {data[data$Admin2 == as.character(x) & data$Province_State == as.character(y)]$Confirmed}, counties$NAME, counties$STATENAME)
 counties$cases[sapply(counties$cases, function(x) length(x) == 0)] <- 0
@@ -35,7 +41,6 @@ ui <- fluidPage(
 )
 
 server <- function(input, output, session) {
-  pal <- colorBin(colorRamp(c("#FFBB00","#FF0000"), interpolate = "linear"), domain = NULL, bins = 15)
   output$mymap <- renderLeaflet({
     leaflet(counties) %>%
       addTiles() %>%
