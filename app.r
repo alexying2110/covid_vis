@@ -5,33 +5,27 @@ library(rgdal)
 library(dplyr)
 library(DT)
 library(data.table)
+library(bit64)
 library(ggplot2)
 library(rsconnect)
 library(profvis)
 
-hospitals <- read.csv("./our_data/US/hospitals.csv")
+#setwd("/home/lofatdairy/code/sialab/covid_vis")
 
-setwd("/home/lofatdairy/code/sialab/covid_vis")
-time <- Sys.time()
 counties <- readOGR("our_data/US/counties.json")
-print(Sys.time() - time)
-# states <- readOGR("our_data/US/states.json")
-# 
-# stateNames <- setNames(as.list(as.character(states$NAME)), states$STATE)
-# 
-# data <- fread("csse_data/csse_covid_19_data/csse_covid_19_daily_reports/03-24-2020.csv")
-# data <- data[data$Country_Region == "US"]
-# 
-# counties$STATENAME <- sapply(counties$STATE, function(x) {stateNames[[as.character(x)]]})
-# 
-# writeOGR(counties, "./our_data/US/counties.json", layer = "counties_low", driver="GeoJSON")
+data <- fread("csse_data/csse_covid_19_data/csse_covid_19_daily_reports/03-24-2020.csv")
+data <- data[Country_Region == "US"]
 
-counties$cases <- mapply(function(x, y) {data[data$Admin2 == as.character(x) & data$Province_State == as.character(y)]$Confirmed}, counties$NAME, counties$STATENAME)
-counties$cases[sapply(counties$cases, function(x) length(x) == 0)] <- 0
-counties$cases <- as.numeric(counties$cases)
+obs <- fread("our_data/test/test.csv")
+aggregated <- obs[, .(Tests = length(Positive), Positive = sum(Positive)), by = .(County, State)]
+aggregated[, Location := paste0(County, ", ", State)]
+setkey(aggregated, Location)
+
+#Remove if_else if counties are actually reported correctly
+counties$cases <- aggregated[if_else(counties$STATENAME == "New York" & counties$NAME %in% c("Bronx", "New York", "Kings", "Queens", "Richmond"), "New York City, New York", paste0(counties$NAME, ", ", counties$STATENAME)), Positive]
+counties$cases[is.na(counties$cases)] <- 0
 
 pal <- colorBin(colorRamp(c("#FFDD00","#FF0000")), domain = NULL, bins = 15)
-
 ui <- fluidPage(
   fluidRow(
     mainPanel(
@@ -46,8 +40,7 @@ server <- function(input, output, session) {
       addTiles() %>%
       addProviderTiles(providers$CartoDB.DarkMatterNoLabels) %>% 
       addPolygons(stroke = FALSE, smoothFactor = 0.3, fillOpacity = 1,
-                  color = ~ifelse(cases == 0, "#00FF00", pal(as.numeric(log10(cases)))),
-                  label = ~paste0(NAME, ", ", STATENAME, ": ", cases),
+                  label = ~paste0(NAME),
                   group = "Tested"
                 ) %>%
       addPolygons(stroke = FALSE, smoothFactor = 0.3, fillOpacity = ~ifelse(cases == 0, .5, .7),
