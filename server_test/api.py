@@ -18,6 +18,9 @@ def gen_response():
 
     obs["Positive"] = ["TRUE" if random.random() < 0.4 else "FALSE" for i in range(200)]
     obs["Updated"] = [random.randint(start_time, current_time) for i in range(200)]
+    obs["Race"] = ["White" if random.random() < .75 else "Black" if random.random() < .6 else "Asian" for i in range(200)]
+    obs["Hispanic"] = ["TRUE" if random.random() < .12 else "FALSE" for i in range(200)]
+    obs["Age"] = np.floor(np.random.normal(48, 12, 200))
 
     response = {}
     for i in range(200):
