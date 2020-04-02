@@ -1,14 +1,14 @@
 library(data.table)
 library(dplyr)
 
-setwd("/home/lofatdairy/code/sialab/covid_vis")
+setwd("/home/ubuntu/covid_vis")
 startData <- fread("csse_data/csse_covid_19_data/csse_covid_19_daily_reports/03-24-2020.csv")
 startData <- startData[Country_Region == "US"]
 
-currentTime <- as.numeric(as.POSIXct(Sys.time()))
-startTime <- currentTime - 1000 * 60 * 60 * 24 * 5
+currentTime <- floor(as.numeric(as.POSIXct(Sys.time())))
+startTime <- currentTime - 1000 * 60 * 60 * 24
 
-nObs <- 100000
+nObs <- 10000
   
 testObs <- sample_n(startData, size = nObs, replace = T, weight = Confirmed)
 testObs <- testObs[, c("Admin2", "Province_State", "Lat", "Long_")]
