@@ -1,12 +1,13 @@
 library(data.table)
 library(dplyr)
 
-setwd("/home/ubuntu/covid_vis")
+#setwd("/home/ubuntu/covid_vis")
+setwd("/home/lofatdairy/code/sialab/covid_vis")
 startData <- fread("csse_data/csse_covid_19_data/csse_covid_19_daily_reports/03-24-2020.csv")
 startData <- startData[Country_Region == "US"]
 
 currentTime <- floor(as.numeric(as.POSIXct(Sys.time())))
-startTime <- currentTime - 1000 * 60 * 60 * 24
+startTime <- currentTime - 60 * 60 * 24
 
 nObs <- 10000
   
