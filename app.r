@@ -49,6 +49,11 @@ server <- function(input, output, session) {
   # update time, race, hispanic, and age of the user/test.
   obs <- fread("our_data/test/test.csv")
   
+  pop <- fread("our_data/US/census_pop_2019.csv")
+  pop$CTYNAME[1835] <- "Dona Ana County"
+  pop[, Location := paste0(unlist(strsplit(CTYNAME, " County")), ", ", STNAME)]
+  setkey(pop, Location)
+  
   # aggregated is basically taking all the observations in obs, and grouping them by state and county (some county
   # names are the same in different states, so we use both). For example, if there are 100 observations in LA, California,
   # and 50 are positive, then the aggregated table will look like this:
@@ -74,6 +79,7 @@ server <- function(input, output, session) {
   # cases in all 5 boroughs as "NYC", so queries like "Bronx, New York", don't have an entry in aggregated, and would be NA. So
   # we just treat all these locations as "New York City, New York", and return the number of cases there.
   counties$cases <- aggregated[if_else(counties$STATENAME == "New York" & counties$NAME %in% c("Bronx", "New York", "Kings", "Queens", "Richmond"), "New York City, New York", paste0(counties$NAME, ", ", counties$STATENAME)), Positive]
+  
   # This line basically takes all NA values in the counties$cases vector and converts them to 0. Counties will no cases are not
   # listed in aggregated
   counties$cases[is.na(counties$cases)] <- 0
@@ -81,6 +87,9 @@ server <- function(input, output, session) {
   # Basically the same thing as the previous line except now we match counties to the number of tests
   counties$tests <- aggregated[if_else(counties$STATENAME == "New York" & counties$NAME %in% c("Bronx", "New York", "Kings", "Queens", "Richmond"), "New York City, New York", paste0(counties$NAME, ", ", counties$STATENAME)), Tests]
   counties$tests[is.na(counties$tests)] <- 0
+  
+  # Basically the same thing as the previous line except now we match counties to the number of tests
+  # counties$pop <- pop[paste0(counties$NAME, ", ", counties$STATENAME), POPESTIMATE2019]
   
   # To the output object, we add the map key, and assign it a leaflet map.
   output$map <- renderLeaflet({
@@ -121,21 +130,14 @@ server <- function(input, output, session) {
   output$posRace <- renderPlot({
     id <- strsplit(input$map_shape_click, ",")[[1]]
     subset <- obs[County == id[1] & State == id[2] & Positive]
-    breakdown <- subset[,length(Positive)/nrow(subset) * 100, by = Race]
+    breakdown <- subset[, length(Positive)/nrow(subset) * 100, by = Race]
     ggplot(breakdown, aes(y = V1, fill = Race)) + geom_bar(width = 1) + coord_polar("y", start = 0)
-  })
-  
-  output$testRace <- renderPlot({
-    id <- strsplit(input$map_shape_click, ",")[[1]]
-    subset <- obs[County == id[1] & State == id[2]]
-    breakdown <- c()
-    ggplot(subset, aes(y = Race))
   })
   
   output$posAge <- renderPlot({
     id <- strsplit(input$map_shape_click, ",")[[1]]
-    subset <- obs[County == id[1] & State == id[2]]
-    breakdown <- c()
+    subset <- obs[County == id[1] & State == id[2] & Positive]
+    breakdown <- subset[]
     ggplot(subset, aes(y = Race))
   })
 }
