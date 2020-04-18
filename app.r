@@ -12,15 +12,17 @@ library(profvis)
 library(scales)
 library(shinydashboard)
 
+
 # setwd("/home/ubuntu/covid_vis")
 setwd("/home/lofatdairy/code/sialab/covid_vis")
+
 
 sidebar <- dashboardSidebar(
   sidebarMenu(
     menuItem("Dashboard", tabName = "maps", icon = icon("dashboard")),
+    menuItem("Tables", tabName = "tables", icon = icon("th")),
     menuItem("Graphs", tabName = "graphs", icon = icon("th")),
-    menuItem("Charts", tabName = "charts", icon = icon("th")),
-    menuItem("Filters", tabName = "filters", icon = icon("th")),
+    #menuItem("Filters", tabName = "filters", icon = icon("th")),
     width = 230
   )
 )
@@ -29,6 +31,7 @@ body <- dashboardBody(
   tabItems(
     #first dashboard tab content
     tabItem(tabName = "maps",
+            titlePanel("    Map"),
             fluidRow(
               sidebarPanel(
                 sliderInput("time", 
@@ -44,7 +47,7 @@ body <- dashboardBody(
                 radioButtons("counties", label = h3("Placeholder 2"), choices = c("Population", "Beds", "Elderly Population", "Comorbidities"))
               ),
               mainPanel(
-                leafletOutput(outputId = "map")
+                leafletOutput(outputId = "mymap")
               ),
             ),
             fluidRow(
@@ -60,17 +63,41 @@ body <- dashboardBody(
             )
     ),
     #second dashboard tab content
-    tabItem(tabName = "graphs", h2("Graphs tab content here")
+    tabItem(tabName = "tables", 
+            titlePanel("All Data"),
+            fluidRow(
+              column(12,
+                     DTOutput('table')
+              )
+            )
     ),
     #third dashboard tab content
-    tabItem(tabName = "charts",
-            h2("Charts tab content here")
-    ),
-    tabItem(tabName = "filters",
-            h2("Filters tab content here")
+    tabItem(tabName = "graphs",
+            fluidRow(
+              titlePanel("Distribution of Cases"),
+              sidebarPanel(
+                selectInput("State1", 
+                            "Select a field to create histograms by age",
+                            choices = c("Tests", "Positive")
+                )
+              ),
+              sidebarPanel(
+                selectInput("State2", 
+                           "Select a field to create bar graph by race",
+                            choices = c("Tests", "Positive")
+                )
+              ),
+              mainPanel(
+                plotOutput(outputId = "myhist")
+              ),
+              mainPanel(
+                plotOutput(outputId = "bar")
+              )
+            )
     )
   )
 )
+
 
 ui <- dashboardPage( 
   skin="blue",
@@ -89,7 +116,7 @@ beds <- beds[, .(Beds = sum(BEDS)), by = .(COUNTY, STATE)]
 beds[, Location := paste0(COUNTY, ", ", STATE)]
 setkey(beds, Location)
 
-#have to clean ths fucking beds dt jfc
+# TODO: have to clean the fucking beds dt jfc
 
 server <- function(input, output, session) {
   obs <- fread("our_data/test/test.csv")
@@ -113,6 +140,38 @@ server <- function(input, output, session) {
   # counties$ages[is.na(counties$ages)] <- 0
   
   # TODO: handle the fact that county names are fucked, and that state names are reproduced
+  
+  output$table <- renderDT(
+    obs, # data
+    class = "display nowrap compact", # style
+    filter = "top" # location of column filters
+  )
+  
+  output$myhist <- renderPlot({
+    if(input$State1 == "Tests"){
+      #hist(AgeTest, main = "Tests by Age")
+      hist(agg$Age, freq=agg$Tests, main = "Tests by Age", xlab="Age")
+    }
+      
+    if(input$State1 == "Positive"){
+      #hist(AgePos, main = "Cases by Age")
+      hist(agg$Age, freq=agg$Positive, main = "Cases by Age", xlab="Age")
+      
+    }
+  })
+  
+  output$bar <- renderPlot({
+    if(input$State2 == "Tests"){
+      barplot(RaceTest, main = "Tests per Race", ylab= "Count", xlab="Races", names.arg=c("Black", "White", "Asian"))
+      #barplot(agg1$Race, freq=agg1$Tests, main = "Tests per Race", ylab= "Count", xlab="Races", names.arg=c("Black", "White", "Asian"))
+    }
+    
+    if(input$State2 == "Positive"){
+      barplot(RacePos, main ="Cases per Race", ylab= "Count", xlab="Races", names.arg=c("Black", "White", "Asian"))
+      #barplot(agg1$Race, freq=agg1$Positive, main ="Cases per Race", ylab= "Count", xlab="Races", names.arg=c("Black", "White", "Asian"))
+    }
+  })
+  
   # pop <- fread("our_data/US/census_pop_2019.csv")
   # pop$CTYNAME[1835] <- "Dona Ana County"
   # pop <- pop[!(CTYNAME == "District of Columbia" & COUNTY == 1)]
@@ -156,6 +215,31 @@ server <- function(input, output, session) {
                   group = "comorbidity"
       )
   })
+
+  # for histogram
+  # County <- obs$County 
+  # State <- obs$State
+  # Lat <- obs$Lat
+  # Long <- obs$Long
+  # Positive <- obs$Positive
+  # Race <- obs$Race #number of cases by race bar graph, filter by state, county
+  # Age <- obs$Age  #number cases by age histogram, filter by state, county
+  
+  
+  agg <- obs[, .(Tests = length(Positive), Positive = sum(Positive)), by = .(Age)]
+  agg1 <- obs[, .(Tests = length(Positive), Positive = sum(Positive)), by = .(Race)]
+  
+  RacePos<-agg1[, Positive]
+  RaceTest <- agg1[, Tests]
+  #AgePos <- agg[, Positive]
+  #AgeTest <- agg[, Tests]
+  
+  
+  aggregated <- obs[, .(Tests = length(Positive), Positive = sum(Positive)), by = .(County, State)]
+  aggregated[, Location := paste0(County, ", ", State)]
+  setkey(aggregated, Location)
+
+  # counties$pop <- pop[paste0(counties$NAME, ", ", counties$STATENAME), POPESTIMATE2019]
   
   observeEvent(listener(), {
     unixTime <- as.numeric(input$time)
@@ -213,7 +297,6 @@ server <- function(input, output, session) {
   })
   
   observeEvent(input$map_shape_click, {
-    print("click")
     if (input$map_shape_click$group != "marker") {
       return()
     }
@@ -229,6 +312,8 @@ server <- function(input, output, session) {
         scale_y_continuous(name = "Number of Cases") +
         scale_x_continuous(name = "Date", labels = function(x) {as.Date(as.POSIXct(x, origin = "1970-01-01"))})
     })
+    
+    
     
     output$posRace <- renderPlot({
       subset <- obs[County == id[1] & State == id[2] & Positive]
