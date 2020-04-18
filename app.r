@@ -47,7 +47,7 @@ body <- dashboardBody(
                 radioButtons("counties", label = h3("Placeholder 2"), choices = c("Population", "Beds", "Elderly Population", "Comorbidities"))
               ),
               mainPanel(
-                leafletOutput(outputId = "mymap")
+                leafletOutput(outputId = "map")
               ),
             ),
             fluidRow(
@@ -178,42 +178,34 @@ server <- function(input, output, session) {
   # pop[Location := paste0(unlist(strsplit(CTYNAME, " County")), ", ", STNAME)]
   # setkey(pop, Location)
   
-  listener <- reactive({
-    list(input$markers, input$time)
-  })
-  
   output$map <- renderLeaflet({
     leaflet(counties) %>%
       addProviderTiles(providers$CartoDB.DarkMatterNoLabels) %>%
       setView(lng = -97, lat = 39, zoom = 3) %>%
+      # addPolygons(stroke = FALSE,
+      #             smoothFactor = 0.3,
+      #             color = ~pal(as.numeric(beds)),
+      #             label = ~paste0(NAME, ", ", STATENAME),
+      #             group = "population"
+      # ) %>%
       addPolygons(stroke = FALSE,
                   smoothFactor = 0.3,
-                  fillOpacity = ~ifelse(ages == 0, .5, .7),
                   color = ~pal(as.numeric(beds)),
-                  label = ~paste0(NAME, ", ", STATENAME, ": ", ages),
-                  group = "population"
-      ) %>%
-      addPolygons(stroke = FALSE,
-                  smoothFactor = 0.3,
-                  fillOpacity = ~ifelse(ages == 0, .5, .7),
-                  color = ~pal(as.numeric(beds)),
-                  label = ~paste0(NAME, ", ", STATENAME, ": ", ages),
+                  label = ~paste0(NAME, ", ", STATENAME),
                   group = "beds"
-      ) %>%
-      addPolygons(stroke = FALSE,
-                  smoothFactor = 0.3,
-                  fillOpacity = ~ifelse(ages == 0, .5, .7),
-                  color = ~pal(as.numeric(beds)),
-                  label = ~paste0(NAME, ", ", STATENAME, ": ", ages),
-                  group = "elderly"
-      ) %>%
-      addPolygons(stroke = FALSE,
-                  smoothFactor = 0.3,
-                  fillOpacity = ~ifelse(ages == 0, .5, .7),
-                  color = ~pal(as.numeric(beds)),
-                  label = ~paste0(NAME, ", ", STATENAME, ": ", ages),
-                  group = "comorbidity"
       )
+      # addPolygons(stroke = FALSE,
+      #             smoothFactor = 0.3,
+      #             color = ~pal(as.numeric(beds)),
+      #             label = ~paste0(NAME, ", ", STATENAME),
+      #             group = "elderly"
+      # ) %>%
+      # addPolygons(stroke = FALSE,
+      #             smoothFactor = 0.3,
+      #             color = ~pal(as.numeric(beds)),
+      #             label = ~paste0(NAME, ", ", STATENAME),
+      #             group = "comorbidity"
+      # )
   })
 
   # for histogram
@@ -235,13 +227,13 @@ server <- function(input, output, session) {
   #AgeTest <- agg[, Tests]
   
   
-  aggregated <- obs[, .(Tests = length(Positive), Positive = sum(Positive)), by = .(County, State)]
-  aggregated[, Location := paste0(County, ", ", State)]
-  setkey(aggregated, Location)
+  # aggregated <- obs[, .(Tests = length(Positive), Positive = sum(Positive)), by = .(County, State)]
+  # aggregated[, Location := paste0(County, ", ", State)]
+  # setkey(aggregated, Location)
 
   # counties$pop <- pop[paste0(counties$NAME, ", ", counties$STATENAME), POPESTIMATE2019]
   
-  observeEvent(listener(), {
+  observeEvent(c(input$time, input$markers), {
     unixTime <- as.numeric(input$time)
     aggregated <- obs[Updated < unixTime, .(Tests = length(Positive), Positive = sum(Positive)), by = .(County, State)]
     aggregated[, Location := paste0(County, ", ", State)]
@@ -255,7 +247,7 @@ server <- function(input, output, session) {
       aggregated[, Markers := Positive]
     }
     
-    if (input$markers == "Cases per Capita") {
+    if (input$markers == "Cases Per Capita") {
       aggregated[, Markers := Tests]
     }
     
@@ -264,37 +256,39 @@ server <- function(input, output, session) {
     
     leafletProxy("map", data = aggregated) %>%
       clearGroup(group = "marker") %>%
-      addCircleMarkers(lng = ~Long, 
-                 lat = ~Lat, layerId = ~Location,
+      addCircleMarkers(
+                 lng = ~Long, 
+                 lat = ~Lat, 
+                 layerId = ~Location,
                  radius = ~log10(Markers) * 5,
                  opacity = .6,
                  color = ~ifelse(input$markers == "Tests", "#FFDD00", "#FF0000"), 
                  stroke = F,
-                 group = "marker",
-                 label = ~ifelse(State == '', as.character(County), Location),
-                 popup = ~ifelse(State == '', as.character(County), Location),
+                 group = "marker"
+                 #label = ~if_else(County == '', as.character(State), as.character(paste0(County, ", ", State)))
+                 #popup = ~ifelse(State == '', as.character(County), Location)
       )
   })
   
-  observeEvent(input$counties, {
-    groupToShow = "population"
-    
-    if (input$counties == "Beds") {
-      groupToShow = "beds"
-    }
-    if (input$counties == "Elderly Population") {
-      groupToShow = "elderly"
-    }
-    if (input$counties == "Comorbidities") {
-      groupToShow = "comorbidities"
-    }
-    leafletProxy("map", data = aggregated) %>%
-      hideGroup("population") %>%
-      hideGroup("beds") %>%
-      hideGroup("elderly") %>%
-      hideGroup("comorbidities") %>%
-      showGroup(groupToShow)
-  })
+  # observeEvent(input$counties, {
+  #   groupToShow = "population"
+  #   
+  #   if (input$counties == "Beds") {
+  #     groupToShow = "beds"
+  #   }
+  #   if (input$counties == "Elderly Population") {
+  #     groupToShow = "elderly"
+  #   }
+  #   if (input$counties == "Comorbidities") {
+  #     groupToShow = "comorbidities"
+  #   }
+  #   leafletProxy("map", data = aggregated) %>%
+  #     hideGroup("population") %>%
+  #     hideGroup("beds") %>%
+  #     hideGroup("elderly") %>%
+  #     hideGroup("comorbidities") %>%
+  #     showGroup(groupToShow)
+  # })
   
   observeEvent(input$map_shape_click, {
     if (input$map_shape_click$group != "marker") {
