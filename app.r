@@ -66,9 +66,7 @@ body <- dashboardBody(
     tabItem(tabName = "tables", 
             titlePanel("All Data"),
             fluidRow(
-              column(12,
-                     DTOutput('table')
-              )
+              column(12, DTOutput('table'))
             )
     ),
     #third dashboard tab content
