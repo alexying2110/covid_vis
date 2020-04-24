@@ -16,6 +16,11 @@ library(shinydashboard)
 # setwd("/home/ubuntu/covid_vis")
 setwd("/home/lofatdairy/code/sialab/covid_vis")
 
+# pop <- fread("our_data/US/census_pop_2019.csv")
+# pop$CTYNAME[1835] <- "Dona Ana County"
+# pop <- pop[!(CTYNAME == "District of Columbia" & COUNTY == 1)]
+# pop[Location := paste0(unlist(strsplit(CTYNAME, " County")), ", ", STNAME)]
+# setkey(pop, Location)
 
 sidebar <- dashboardSidebar(
   sidebarMenu(
@@ -134,9 +139,6 @@ server <- function(input, output, session) {
   counties$beds <- beds[paste0(counties$NAME, ", ", counties$STATENAME), Beds]
   counties$beds[is.na(counties$beds)] <- 0 
   
-  # counties$ages <- aggregated[paste0(counties$NAME, ", ", counties$STATENAME), Ages]
-  # counties$ages[is.na(counties$ages)] <- 0
-  
   # TODO: handle the fact that county names are fucked, and that state names are reproduced
   
   output$table <- renderDT(
@@ -170,12 +172,6 @@ server <- function(input, output, session) {
     }
   })
   
-  # pop <- fread("our_data/US/census_pop_2019.csv")
-  # pop$CTYNAME[1835] <- "Dona Ana County"
-  # pop <- pop[!(CTYNAME == "District of Columbia" & COUNTY == 1)]
-  # pop[Location := paste0(unlist(strsplit(CTYNAME, " County")), ", ", STNAME)]
-  # setkey(pop, Location)
-  
   output$map <- renderLeaflet({
     leaflet(counties) %>%
       addProviderTiles(providers$CartoDB.DarkMatterNoLabels) %>%
@@ -190,7 +186,8 @@ server <- function(input, output, session) {
                   smoothFactor = 0.3,
                   color = ~pal(as.numeric(beds)),
                   label = ~paste0(NAME, ", ", STATENAME),
-                  group = "beds"
+                  group = "beds",
+                  layerId = ~paste0(NAME, ", ", STATENAME)
       )
       # addPolygons(stroke = FALSE,
       #             smoothFactor = 0.3,
@@ -233,25 +230,23 @@ server <- function(input, output, session) {
   
   observeEvent(c(input$time, input$markers), {
     unixTime <- as.numeric(input$time)
+    if (unixTime == 0) {
+      return(NULL)
+    }
     aggregated <- obs[Updated < unixTime, .(Tests = length(Positive), Positive = sum(Positive)), by = .(County, State)]
     aggregated[, Location := paste0(County, ", ", State)]
     setkey(aggregated, Location)
-    
     if (input$markers == "Tests") {
       aggregated[, Markers := Tests]
     }
-    
     if (input$markers == "Cases") {
       aggregated[, Markers := Positive]
     }
-    
     if (input$markers == "Cases Per Capita") {
       aggregated[, Markers := Tests]
     }
-    
     aggregated$Lat <- countyCenters[aggregated$Location, Lat]
     aggregated$Long <- countyCenters[aggregated$Location, Long]
-    
     leafletProxy("map", data = aggregated) %>%
       clearGroup(group = "marker") %>%
       addCircleMarkers(
@@ -259,14 +254,68 @@ server <- function(input, output, session) {
                  lat = ~Lat, 
                  layerId = ~Location,
                  radius = ~log10(Markers) * 5,
-                 opacity = .6,
-                 color = ~ifelse(input$markers == "Tests", "#FFDD00", "#FF0000"), 
-                 stroke = F,
-                 group = "marker"
-                 #label = ~if_else(County == '', as.character(State), as.character(paste0(County, ", ", State)))
-                 #popup = ~ifelse(State == '', as.character(County), Location)
+                 opacity = 0.6,
+                 color = ~ifelse(input$markers == "Tests", "#FFDD00", "#FF0000"),
+                 stroke = T, 
+                 weight = 0.8,
+                 group = "marker",
+                 label = ~ifelse(State == '', as.character(County), Location),
+                 popup = ~ifelse(State == '', as.character(County), Location)
       )
   })
+  
+  observeEvent(input$map_shape_click, {
+    id <- strsplit(input$map_shape_click$id, ", ")[[1]]
+    locationObs <- obs[County == id[1] & State == id[2] & Positive]
+    output$posRace <- renderPlot({
+      ggplot(locationObs, aes(Race)) + 
+        geom_bar() + 
+        theme_minimal()
+    })
+    output$posAge <- renderPlot({
+      ggplot(locationObs, aes(Age)) +
+        geom_histogram(bins = 5) +
+        theme_minimal()
+    })
+    output$logisticCurve <- renderPlot({
+      setorder(locationObs, Updated)
+      locationObs[, nCases := as.numeric(row.names(locationObs))]
+      updateData <- locationObs[, .(Updated, nCases)]
+      updateData <- rbind(data.frame(Updated = updateMin, nCases = 0), updateData)
+      ggplot(updateData, aes(x = Updated, y = nCases)) + 
+        geom_step() + 
+        theme_minimal() +
+        scale_y_continuous(name = "Number of Cases") +
+        scale_x_continuous(name = "Date", labels = function(x) {as.Date(as.POSIXct(x, origin = "1970-01-01"))})
+    })
+  })
+  
+  observeEvent(input$map_marker_click, {
+    id <- strsplit(input$map_marker_click$id, ", ")[[1]]
+    locationObs <- obs[County == id[1] & State == id[2] & Positive]
+    output$posRace <- renderPlot({
+      ggplot(locationObs, aes(Race)) +
+        geom_bar() +
+        theme_minimal()
+    })
+    output$posAge <- renderPlot({
+      ggplot(locationObs, aes(Age)) +
+        geom_histogram(bins = 5) +
+        theme_minimal()
+    })
+    output$logisticCurve <- renderPlot({
+      setorder(locationObs, Updated)
+      locationObs[, nCases := as.numeric(row.names(locationObs))]
+      updateData <- locationObs[, .(Updated, nCases)]
+      updateData <- rbind(data.frame(Updated = updateMin, nCases = 0), updateData)
+      ggplot(updateData, aes(x = Updated, y = nCases)) +
+        geom_step() +
+        theme_minimal() +
+        scale_y_continuous(name = "Number of Cases") +
+        scale_x_continuous(name = "Date", labels = function(x) {as.Date(as.POSIXct(x, origin = "1970-01-01"))})
+    })
+  })
+  
   
   # observeEvent(input$counties, {
   #   groupToShow = "population"
@@ -287,40 +336,6 @@ server <- function(input, output, session) {
   #     hideGroup("comorbidities") %>%
   #     showGroup(groupToShow)
   # })
-  
-  observeEvent(input$map_shape_click, {
-    if (input$map_shape_click$group != "marker") {
-      return()
-    }
-    
-    id <- strsplit(input$map_shape_click$id, ", ")[[1]]
-    output$logisticCurve <- renderPlot({
-      subset <- obs[County == id[1] & State == id[2] & Positive]
-      setorder(subset, Updated)
-      subset[, nCases := as.numeric(row.names(subset))]
-      ggplot(subset, aes(x = Updated, y = nCases)) + 
-        geom_step() + 
-        theme_minimal() +
-        scale_y_continuous(name = "Number of Cases") +
-        scale_x_continuous(name = "Date", labels = function(x) {as.Date(as.POSIXct(x, origin = "1970-01-01"))})
-    })
-    
-    
-    
-    output$posRace <- renderPlot({
-      subset <- obs[County == id[1] & State == id[2] & Positive]
-      ggplot(subset, aes(Race)) + 
-        geom_bar() + 
-        theme_minimal()
-    })
-    
-    output$posAge <- renderPlot({
-      subset <- obs[County == id[1] & State == id[2] & Positive]
-      ggplot(subset, aes(Age)) +
-        geom_histogram(bins = 5) +
-        theme_minimal()
-    })
-  })
 }
 
 shinyApp(ui, server)
