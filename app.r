@@ -13,8 +13,8 @@ library(scales)
 library(shinydashboard)
 
 
-# setwd("/home/ubuntu/covid_vis")
-setwd("/home/lofatdairy/code/sialab/covid_vis")
+setwd("/home/ubuntu/covid_vis")
+# setwd("/home/lofatdairy/code/sialab/covid_vis")
 
 
 sidebar <- dashboardSidebar(
@@ -48,7 +48,7 @@ body <- dashboardBody(
               ),
               mainPanel(
                 leafletOutput(outputId = "map")
-              ),
+              )
             ),
             fluidRow(
               column(4,
