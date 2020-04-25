@@ -14,7 +14,7 @@ library(shinydashboard)
 
 
 # setwd("/home/ubuntu/covid_vis")
-setwd("/home/lofatdairy/code/sialab/covid_vis")
+#setwd("/home/lofatdairy/code/sialab/covid_vis")
 
 # pop <- fread("our_data/US/census_pop_2019.csv")
 # pop$CTYNAME[1835] <- "Dona Ana County"
@@ -25,7 +25,7 @@ setwd("/home/lofatdairy/code/sialab/covid_vis")
 sidebar <- dashboardSidebar(
   sidebarMenu(
     menuItem("Dashboard", tabName = "maps", icon = icon("dashboard")),
-    menuItem("Tables", tabName = "tables", icon = icon("th")),
+    #menuItem("Tables", tabName = "tables", icon = icon("th")),
     menuItem("Graphs", tabName = "graphs", icon = icon("th")),
     #menuItem("Filters", tabName = "filters", icon = icon("th")),
     width = 230
@@ -68,33 +68,49 @@ body <- dashboardBody(
             )
     ),
     #second dashboard tab content
-    tabItem(tabName = "tables", 
-            titlePanel("All Data"),
-            fluidRow(
-              column(12, DTOutput('table'))
-            )
-    ),
+    #tabItem(tabName = "tables", 
+            #titlePanel("    All Data"),
+            #fluidRow(
+              #column(12, DTOutput('table'))
+            #)
+    #),
     #third dashboard tab content
     tabItem(tabName = "graphs",
             fluidRow(
-              titlePanel("Distribution of Cases"),
-              sidebarPanel(
-                selectInput("State1", 
-                            "Select a field to create histograms by age",
-                            choices = c("Tests", "Positive")
+              titlePanel("      Distributions"),
+              mainPanel(
+                #titlePanel("    All Data"),
+                fluidRow(
+                  column(12, DTOutput('table'))
+                ),
+                #selectInput("State0", 
+                            #"Select a Region",
+                            #choices = c("Tests", "Positive")
+                #),
+                fluidPage(
+                  #sidebarPanel(
+                    column(
+                      6, selectInput("State1", 
+                                  "Select a field to create histograms by age",
+                                  choices = c("Tests", "Positive")
+                      )
+                    ),
+                    column(
+                      6, selectInput("State2", 
+                                  "Select a field to create bar graph by race",
+                                  choices = c("Tests", "Positive")
+                      )
+                    )
+                  #)
                 )
               ),
-              sidebarPanel(
-                selectInput("State2", 
-                           "Select a field to create bar graph by race",
-                            choices = c("Tests", "Positive")
+              fluidPage(
+                column(
+                  6, plotOutput(outputId = "myhist")
+                ),
+                column(
+                  6, plotOutput(outputId = "bar")
                 )
-              ),
-              mainPanel(
-                plotOutput(outputId = "myhist")
-              ),
-              mainPanel(
-                plotOutput(outputId = "bar")
               )
             )
     )
@@ -142,30 +158,61 @@ server <- function(input, output, session) {
   # TODO: handle the fact that county names are fucked, and that state names are reproduced
   
   output$table <- renderDT(
-    obs, # data
+    #obs, # data
+    #only certain columns to display
+    obs %>% select(1, 2, 5, 7, 9),
     class = "display nowrap compact", # style
     filter = "top" # location of column filters
   )
   
+  range<- c(0, 10, 30, 70, 100)
+  tb = c(0,10,20,30,40,50,60,70,80,90,100)
+  col <- findInterval(tb, range, all.inside = TRUE)
+  col[which(col==4)] <- "firebrick1"
+  col[which(col==3)] <- "gold"
+  col[which(col==2)] <- "darkolivegreen1"
+  col[which(col==1)] <- "forestgreen"
+  
   output$myhist <- renderPlot({
     if(input$State1 == "Tests"){
       #hist(AgeTest, main = "Tests by Age")
-      hist(agg$Age, freq=agg$Tests, main = "Tests by Age", xlab="Age")
+      hist(
+        agg$Age, 
+        freq=agg$Tests, 
+        #col=("yellow", "red", "yellow"), 
+        col = col,
+        #border= col,
+        breaks = tb,
+        main = "Tests by Age", 
+        xlab="Age")
     }
       
     if(input$State1 == "Positive"){
       #hist(AgePos, main = "Cases by Age")
-      hist(agg$Age, freq=agg$Positive, main = "Cases by Age", xlab="Age")
+      hist(
+        agg$Age, 
+        freq=agg$Positive, 
+        breaks = tb,
+        #col=("yellow", "red", "yellow"), 
+        col = col,
+        #border=col,
+        main = "Cases by Age", 
+        xlab="Age")
       
     }
   })
   
   output$bar <- renderPlot({
     if(input$State2 == "Tests"){
-      barplot(RaceTest, main = "Tests per Race", ylab= "Count", xlab="Races", names.arg=c("Black", "White", "Asian"))
+      barplot(
+        RaceTest, 
+        main = "Tests per Race", 
+        col = "darkolivegreen1",
+        ylab= "Count", xlab="Races", 
+        names.arg=c("Black", "White", "Asian")
+      )
       #barplot(agg1$Race, freq=agg1$Tests, main = "Tests per Race", ylab= "Count", xlab="Races", names.arg=c("Black", "White", "Asian"))
     }
-    
     if(input$State2 == "Positive"){
       barplot(RacePos, main ="Cases per Race", ylab= "Count", xlab="Races", names.arg=c("Black", "White", "Asian"))
       #barplot(agg1$Race, freq=agg1$Positive, main ="Cases per Race", ylab= "Count", xlab="Races", names.arg=c("Black", "White", "Asian"))
@@ -227,6 +274,7 @@ server <- function(input, output, session) {
   # setkey(aggregated, Location)
 
   # counties$pop <- pop[paste0(counties$NAME, ", ", counties$STATENAME), POPESTIMATE2019]
+  
   
   observeEvent(c(input$time, input$markers), {
     unixTime <- as.numeric(input$time)
@@ -316,6 +364,11 @@ server <- function(input, output, session) {
     })
   })
   
+  
+  #for the graphs tab
+  observeEvent(input$tableId_row_last_clicked , {
+    
+  })
   
   # observeEvent(input$counties, {
   #   groupToShow = "population"
