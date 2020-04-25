@@ -112,12 +112,10 @@ ui <- dashboardPage(
 pal <- colorBin(colorRamp(c("#FFDD00","#FF0000")), domain = NULL, bins = 10)
 
 counties <- readOGR("our_data/US/counties.json")
+
 countyCenters <- fread("our_data/US/county_centers.csv", key = "Location")
 
-beds <- fread("our_data/US/hospitals.csv")
-beds <- beds[, .(Beds = sum(BEDS)), by = .(COUNTY, STATE)]
-beds[, Location := paste0(COUNTY, ", ", STATE)]
-setkey(beds, Location)
+beds <- fread("our_data/US/beds.csv", key = "Location")
 
 # TODO: have to clean the fucking beds dt jfc
 
@@ -136,8 +134,6 @@ server <- function(input, output, session) {
     timeFormat = "%b %d %Y, %H:%M"
   )
   
-  counties$beds <- beds[paste0(counties$NAME, ", ", counties$STATENAME), Beds]
-  counties$beds[is.na(counties$beds)] <- 0 
   
   # TODO: handle the fact that county names are fucked, and that state names are reproduced
   
@@ -172,6 +168,7 @@ server <- function(input, output, session) {
     }
   })
   
+  pal = colorBin(colorRamp(c("#ff0000", "#00ff00")), domain = NULL, bins = 20)
   output$map <- renderLeaflet({
     leaflet(counties) %>%
       addProviderTiles(providers$CartoDB.DarkMatterNoLabels) %>%
@@ -184,10 +181,18 @@ server <- function(input, output, session) {
       # ) %>%
       addPolygons(stroke = FALSE,
                   smoothFactor = 0.3,
-                  color = ~pal(as.numeric(beds)),
+                  color = ~pal(log10(as.numeric(beds + 1))),
                   label = ~paste0(NAME, ", ", STATENAME),
                   group = "beds",
-                  layerId = ~paste0(NAME, ", ", STATENAME)
+                  layerId = ~paste0(NAME, ", ", STATENAME),
+                  popup = ~paste0(
+                    ifelse(STATENAME == '', as.character(NAME), Location),
+                    "<br>Population: ",          "Not yet implemented",
+                    "<br>Elderly Population: ",  "Not yet implemented",
+                    "<br>Total hospital beds: ", beds,
+                    "<br>Smoking Population: ",  "Not yet implemented",
+                    "<br> Last Updated: ",       "Not yet implemented"
+                  )
       )
       # addPolygons(stroke = FALSE,
       #             smoothFactor = 0.3,
@@ -260,7 +265,16 @@ server <- function(input, output, session) {
                  weight = 0.8,
                  group = "marker",
                  label = ~ifelse(State == '', as.character(County), Location),
-                 popup = ~ifelse(State == '', as.character(County), Location)
+                 popup = ~paste0(
+                   ifelse(State == '', as.character(County), Location),
+                   "<br># Positive: ",          eval(Positive),
+                   "<br># Tested: ",            eval(Tests),
+                   "<br>Population: ",          "Not yet implemented",
+                   "<br>Elderly Population: ",  "Not yet implemented",
+                   "<br>Total hospital beds: ", "Not yet implemented",
+                   "<br>Smoking Population: ",  "Not yet implemented",
+                   "<br> Last Updated: ",       "Not yet implemented"
+                 )
       )
   })
   
