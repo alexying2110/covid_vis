@@ -72,7 +72,7 @@ body <- dashboardBody(
               titlePanel("      Distributions"),
               sidebarPanel(
                 fluidRow(
-                  DTOutput('table'),
+                  DTOutput('table')
                 ),
                 fluidPage(
                   sliderInput("bins",
@@ -92,7 +92,7 @@ body <- dashboardBody(
                   selectInput("State2", 
                               "Select a field to create bar graph by race",
                               choices = c("Tests", "Positive")
-                  ),
+                  )
                 )
               ),
               mainPanel(
@@ -100,9 +100,9 @@ body <- dashboardBody(
                   plotOutput(outputId = "myhist"),
                   br(),
                   br(),
-                  plotOutput(outputId = "bar"),
+                  plotOutput(outputId = "bar")
                 )
-              ),
+              )
          )
     )
   )
