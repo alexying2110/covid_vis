@@ -3,6 +3,8 @@ library(leaflet)
 library(leaflet.extras)
 library(rgdal)
 library(dplyr)
+library(shinyjs)
+library(htmlwidgets)
 library(DT)
 library(data.table)
 library(bit64)
@@ -14,7 +16,7 @@ library(shinydashboard)
 
 
 # setwd("/home/ubuntu/covid_vis")
-#setwd("/home/lofatdairy/code/sialab/covid_vis")
+setwd("/home/lofatdairy/code/sialab/covid_vis")
 
 # pop <- fread("our_data/US/census_pop_2019.csv")
 # pop$CTYNAME[1835] <- "Dona Ana County"
@@ -38,6 +40,8 @@ body <- dashboardBody(
     tabItem(tabName = "maps",
             titlePanel("    Map"),
             fluidRow(
+              useShinyjs(),
+              extendShinyjs(script = "./map.js"),
               sidebarPanel(
                 sliderInput("time", 
                           label = h3("Time"), 
@@ -137,6 +141,10 @@ beds <- fread("our_data/US/beds.csv", key = "Location")
 
 server <- function(input, output, session) {
   obs <- fread("our_data/test/test.csv")
+  observe({
+    invalidateLater(5 * 60 * 1000, session)
+    obs <- fread("our_data/test/test.csv")
+  })
   
   # Round to nearest 5 minute
   updateMax <- ceiling(max(obs$Updated) / 300) * 300
@@ -241,18 +249,6 @@ server <- function(input, output, session) {
                     "<br> Last Updated: ",       "Not yet implemented"
                   )
       )
-      # addPolygons(stroke = FALSE,
-      #             smoothFactor = 0.3,
-      #             color = ~pal(as.numeric(beds)),
-      #             label = ~paste0(NAME, ", ", STATENAME),
-      #             group = "elderly"
-      # ) %>%
-      # addPolygons(stroke = FALSE,
-      #             smoothFactor = 0.3,
-      #             color = ~pal(as.numeric(beds)),
-      #             label = ~paste0(NAME, ", ", STATENAME),
-      #             group = "comorbidity"
-      # )
   })
 
   # for histogram
@@ -301,29 +297,32 @@ server <- function(input, output, session) {
     aggregated$Lat <- countyCenters[aggregated$Location, Lat]
     aggregated$Long <- countyCenters[aggregated$Location, Long]
     leafletProxy("map", data = aggregated) %>%
-      clearGroup(group = "marker") %>%
-      addCircleMarkers(
-                 lng = ~Long, 
-                 lat = ~Lat, 
-                 layerId = ~Location,
-                 radius = ~log10(Markers) * 5,
-                 opacity = 0.6,
-                 color = ~ifelse(input$markers == "Tests", "#FFDD00", "#FF0000"),
-                 stroke = T, 
-                 weight = 0.8,
-                 group = "marker",
-                 label = ~ifelse(State == '', as.character(County), Location),
-                 popup = ~paste0(
-                   ifelse(State == '', as.character(County), Location),
-                   "<br># Positive: ",          eval(Positive),
-                   "<br># Tested: ",            eval(Tests),
-                   "<br>Population: ",          "Not yet implemented",
-                   "<br>Elderly Population: ",  "Not yet implemented",
-                   "<br>Total hospital beds: ", "Not yet implemented",
-                   "<br>Smoking Population: ",  "Not yet implemented",
-                   "<br> Last Updated: ",       "Not yet implemented"
-                 )
-      )
+      # clearGroup(group = "marker") %>%
+      # addCircleMarkers(
+      #            lng = ~Long, 
+      #            lat = ~Lat, 
+      #            layerId = ~Location,
+      #            radius = ~log10(Markers) * 5,
+      #            opacity = 0.6,
+      #            color = ~ifelse(input$markers == "Tests", "#FFDD00", "#FF0000"),
+      #            stroke = T, 
+      #            weight = 0.8,
+      #            group = "marker",
+      #            label = ~ifelse(State == '', as.character(County), Location),
+      #            popup = ~paste0(
+      #              ifelse(State == '', as.character(County), Location),
+      #              "<br># Positive: ",          eval(Positive),
+      #              "<br># Tested: ",            eval(Tests),
+      #              "<br>Population: ",          "Not yet implemented",
+      #              "<br>Elderly Population: ",  "Not yet implemented",
+      #              "<br>Total hospital beds: ", "Not yet implemented",
+      #              "<br>Smoking Population: ",  "Not yet implemented",
+      #              "<br> Last Updated: ",       "Not yet implemented"
+      #            ) %>%
+      # )
+      onRender("
+        function(el,x) {console.log('ran')}
+               ")
   })
   
   observeEvent(input$map_shape_click, {
