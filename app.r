@@ -16,11 +16,16 @@ library(shinydashboard)
 setwd("/home/ubuntu/covid_vis")
 # setwd("/home/lofatdairy/code/sialab/covid_vis")
 
+# pop <- fread("our_data/US/census_pop_2019.csv")
+# pop$CTYNAME[1835] <- "Dona Ana County"
+# pop <- pop[!(CTYNAME == "District of Columbia" & COUNTY == 1)]
+# pop[Location := paste0(unlist(strsplit(CTYNAME, " County")), ", ", STNAME)]
+# setkey(pop, Location)
 
 sidebar <- dashboardSidebar(
   sidebarMenu(
     menuItem("Dashboard", tabName = "maps", icon = icon("dashboard")),
-    menuItem("Tables", tabName = "tables", icon = icon("th")),
+    #menuItem("Tables", tabName = "tables", icon = icon("th")),
     menuItem("Graphs", tabName = "graphs", icon = icon("th")),
     #menuItem("Filters", tabName = "filters", icon = icon("th")),
     width = 230
@@ -63,35 +68,49 @@ body <- dashboardBody(
             )
     ),
     #second dashboard tab content
-    tabItem(tabName = "tables", 
-            titlePanel("All Data"),
-            fluidRow(
-              column(12,
-                     DTOutput('table')
-              )
-            )
-    ),
+    #tabItem(tabName = "tables", 
+            #titlePanel("    All Data"),
+            #fluidRow(
+              #column(12, DTOutput('table'))
+            #)
+    #),
     #third dashboard tab content
     tabItem(tabName = "graphs",
             fluidRow(
-              titlePanel("Distribution of Cases"),
-              sidebarPanel(
-                selectInput("State1", 
-                            "Select a field to create histograms by age",
-                            choices = c("Tests", "Positive")
+              titlePanel("      Distributions"),
+              mainPanel(
+                #titlePanel("    All Data"),
+                fluidRow(
+                  column(12, DTOutput('table'))
+                ),
+                #selectInput("State0", 
+                            #"Select a Region",
+                            #choices = c("Tests", "Positive")
+                #),
+                fluidPage(
+                  #sidebarPanel(
+                    column(
+                      6, selectInput("State1", 
+                                  "Select a field to create histograms by age",
+                                  choices = c("Tests", "Positive")
+                      )
+                    ),
+                    column(
+                      6, selectInput("State2", 
+                                  "Select a field to create bar graph by race",
+                                  choices = c("Tests", "Positive")
+                      )
+                    )
+                  #)
                 )
               ),
-              sidebarPanel(
-                selectInput("State2", 
-                           "Select a field to create bar graph by race",
-                            choices = c("Tests", "Positive")
+              fluidPage(
+                column(
+                  6, plotOutput(outputId = "myhist")
+                ),
+                column(
+                  6, plotOutput(outputId = "bar")
                 )
-              ),
-              mainPanel(
-                plotOutput(outputId = "myhist")
-              ),
-              mainPanel(
-                plotOutput(outputId = "bar")
               )
             )
     )
@@ -109,12 +128,10 @@ ui <- dashboardPage(
 pal <- colorBin(colorRamp(c("#FFDD00","#FF0000")), domain = NULL, bins = 10)
 
 counties <- readOGR("our_data/US/counties.json")
+
 countyCenters <- fread("our_data/US/county_centers.csv", key = "Location")
 
-beds <- fread("our_data/US/hospitals.csv")
-beds <- beds[, .(Beds = sum(BEDS)), by = .(COUNTY, STATE)]
-beds[, Location := paste0(COUNTY, ", ", STATE)]
-setkey(beds, Location)
+beds <- fread("our_data/US/beds.csv", key = "Location")
 
 # TODO: have to clean the fucking beds dt jfc
 
@@ -133,51 +150,72 @@ server <- function(input, output, session) {
     timeFormat = "%b %d %Y, %H:%M"
   )
   
-  counties$beds <- beds[paste0(counties$NAME, ", ", counties$STATENAME), Beds]
-  counties$beds[is.na(counties$beds)] <- 0 
-  
-  # counties$ages <- aggregated[paste0(counties$NAME, ", ", counties$STATENAME), Ages]
-  # counties$ages[is.na(counties$ages)] <- 0
   
   # TODO: handle the fact that county names are fucked, and that state names are reproduced
   
   output$table <- renderDT(
-    obs, # data
+    #obs, # data
+    #only certain columns to display
+    obs %>% select(1, 2, 5, 7, 9),
     class = "display nowrap compact", # style
     filter = "top" # location of column filters
   )
   
+  range<- c(0, 10, 30, 70, 100)
+  tb = c(0,10,20,30,40,50,60,70,80,90,100)
+  col <- findInterval(tb, range, all.inside = TRUE)
+  col[which(col==4)] <- "firebrick1"
+  col[which(col==3)] <- "gold"
+  col[which(col==2)] <- "darkolivegreen1"
+  col[which(col==1)] <- "forestgreen"
+  
   output$myhist <- renderPlot({
     if(input$State1 == "Tests"){
       #hist(AgeTest, main = "Tests by Age")
-      hist(agg$Age, freq=agg$Tests, main = "Tests by Age", xlab="Age")
+      hist(
+        agg$Age, 
+        freq=agg$Tests, 
+        #col=("yellow", "red", "yellow"), 
+        col = col,
+        #border= col,
+        breaks = tb,
+        main = "Tests by Age", 
+        xlab="Age")
     }
       
     if(input$State1 == "Positive"){
       #hist(AgePos, main = "Cases by Age")
-      hist(agg$Age, freq=agg$Positive, main = "Cases by Age", xlab="Age")
+      hist(
+        agg$Age, 
+        freq=agg$Positive, 
+        breaks = tb,
+        #col=("yellow", "red", "yellow"), 
+        col = col,
+        #border=col,
+        main = "Cases by Age", 
+        xlab="Age")
       
     }
   })
   
   output$bar <- renderPlot({
     if(input$State2 == "Tests"){
-      barplot(RaceTest, main = "Tests per Race", ylab= "Count", xlab="Races", names.arg=c("Black", "White", "Asian"))
+      barplot(
+        RaceTest, 
+        main = "Tests per Race", 
+        col = "darkolivegreen1",
+        ylab= "Count", xlab="Races", 
+        names.arg=c("Black", "White", "Asian")
+      )
       #barplot(agg1$Race, freq=agg1$Tests, main = "Tests per Race", ylab= "Count", xlab="Races", names.arg=c("Black", "White", "Asian"))
     }
-    
     if(input$State2 == "Positive"){
       barplot(RacePos, main ="Cases per Race", ylab= "Count", xlab="Races", names.arg=c("Black", "White", "Asian"))
       #barplot(agg1$Race, freq=agg1$Positive, main ="Cases per Race", ylab= "Count", xlab="Races", names.arg=c("Black", "White", "Asian"))
     }
   })
   
-  # pop <- fread("our_data/US/census_pop_2019.csv")
-  # pop$CTYNAME[1835] <- "Dona Ana County"
-  # pop <- pop[!(CTYNAME == "District of Columbia" & COUNTY == 1)]
-  # pop[Location := paste0(unlist(strsplit(CTYNAME, " County")), ", ", STNAME)]
-  # setkey(pop, Location)
-  
+  pal = colorBin(colorRamp(c("#ff0000", "#00ff00")), domain = NULL, bins = 20)
   output$map <- renderLeaflet({
     leaflet(counties) %>%
       addProviderTiles(providers$CartoDB.DarkMatterNoLabels) %>%
@@ -190,9 +228,18 @@ server <- function(input, output, session) {
       # ) %>%
       addPolygons(stroke = FALSE,
                   smoothFactor = 0.3,
-                  color = ~pal(as.numeric(beds)),
+                  color = ~pal(log10(as.numeric(beds + 1))),
                   label = ~paste0(NAME, ", ", STATENAME),
-                  group = "beds"
+                  group = "beds",
+                  layerId = ~paste0(NAME, ", ", STATENAME),
+                  popup = ~paste0(
+                    ifelse(STATENAME == '', as.character(NAME), Location),
+                    "<br>Population: ",          "Not yet implemented",
+                    "<br>Elderly Population: ",  "Not yet implemented",
+                    "<br>Total hospital beds: ", beds,
+                    "<br>Smoking Population: ",  "Not yet implemented",
+                    "<br> Last Updated: ",       "Not yet implemented"
+                  )
       )
       # addPolygons(stroke = FALSE,
       #             smoothFactor = 0.3,
@@ -233,27 +280,26 @@ server <- function(input, output, session) {
 
   # counties$pop <- pop[paste0(counties$NAME, ", ", counties$STATENAME), POPESTIMATE2019]
   
+  
   observeEvent(c(input$time, input$markers), {
     unixTime <- as.numeric(input$time)
+    if (unixTime == 0) {
+      return(NULL)
+    }
     aggregated <- obs[Updated < unixTime, .(Tests = length(Positive), Positive = sum(Positive)), by = .(County, State)]
     aggregated[, Location := paste0(County, ", ", State)]
     setkey(aggregated, Location)
-    
     if (input$markers == "Tests") {
       aggregated[, Markers := Tests]
     }
-    
     if (input$markers == "Cases") {
       aggregated[, Markers := Positive]
     }
-    
     if (input$markers == "Cases Per Capita") {
       aggregated[, Markers := Tests]
     }
-    
     aggregated$Lat <- countyCenters[aggregated$Location, Lat]
     aggregated$Long <- countyCenters[aggregated$Location, Long]
-    
     leafletProxy("map", data = aggregated) %>%
       clearGroup(group = "marker") %>%
       addCircleMarkers(
@@ -261,13 +307,81 @@ server <- function(input, output, session) {
                  lat = ~Lat, 
                  layerId = ~Location,
                  radius = ~log10(Markers) * 5,
-                 opacity = .6,
-                 color = ~ifelse(input$markers == "Tests", "#FFDD00", "#FF0000"), 
-                 stroke = F,
-                 group = "marker"
-                 #label = ~if_else(County == '', as.character(State), as.character(paste0(County, ", ", State)))
-                 #popup = ~ifelse(State == '', as.character(County), Location)
+                 opacity = 0.6,
+                 color = ~ifelse(input$markers == "Tests", "#FFDD00", "#FF0000"),
+                 stroke = T, 
+                 weight = 0.8,
+                 group = "marker",
+                 label = ~ifelse(State == '', as.character(County), Location),
+                 popup = ~paste0(
+                   ifelse(State == '', as.character(County), Location),
+                   "<br># Positive: ",          eval(Positive),
+                   "<br># Tested: ",            eval(Tests),
+                   "<br>Population: ",          "Not yet implemented",
+                   "<br>Elderly Population: ",  "Not yet implemented",
+                   "<br>Total hospital beds: ", "Not yet implemented",
+                   "<br>Smoking Population: ",  "Not yet implemented",
+                   "<br> Last Updated: ",       "Not yet implemented"
+                 )
       )
+  })
+  
+  observeEvent(input$map_shape_click, {
+    id <- strsplit(input$map_shape_click$id, ", ")[[1]]
+    locationObs <- obs[County == id[1] & State == id[2] & Positive]
+    output$posRace <- renderPlot({
+      ggplot(locationObs, aes(Race)) + 
+        geom_bar() + 
+        theme_minimal()
+    })
+    output$posAge <- renderPlot({
+      ggplot(locationObs, aes(Age)) +
+        geom_histogram(bins = 5) +
+        theme_minimal()
+    })
+    output$logisticCurve <- renderPlot({
+      setorder(locationObs, Updated)
+      locationObs[, nCases := as.numeric(row.names(locationObs))]
+      updateData <- locationObs[, .(Updated, nCases)]
+      updateData <- rbind(data.frame(Updated = updateMin, nCases = 0), updateData)
+      ggplot(updateData, aes(x = Updated, y = nCases)) + 
+        geom_step() + 
+        theme_minimal() +
+        scale_y_continuous(name = "Number of Cases") +
+        scale_x_continuous(name = "Date", labels = function(x) {as.Date(as.POSIXct(x, origin = "1970-01-01"))})
+    })
+  })
+  
+  observeEvent(input$map_marker_click, {
+    id <- strsplit(input$map_marker_click$id, ", ")[[1]]
+    locationObs <- obs[County == id[1] & State == id[2] & Positive]
+    output$posRace <- renderPlot({
+      ggplot(locationObs, aes(Race)) +
+        geom_bar() +
+        theme_minimal()
+    })
+    output$posAge <- renderPlot({
+      ggplot(locationObs, aes(Age)) +
+        geom_histogram(bins = 5) +
+        theme_minimal()
+    })
+    output$logisticCurve <- renderPlot({
+      setorder(locationObs, Updated)
+      locationObs[, nCases := as.numeric(row.names(locationObs))]
+      updateData <- locationObs[, .(Updated, nCases)]
+      updateData <- rbind(data.frame(Updated = updateMin, nCases = 0), updateData)
+      ggplot(updateData, aes(x = Updated, y = nCases)) +
+        geom_step() +
+        theme_minimal() +
+        scale_y_continuous(name = "Number of Cases") +
+        scale_x_continuous(name = "Date", labels = function(x) {as.Date(as.POSIXct(x, origin = "1970-01-01"))})
+    })
+  })
+  
+  
+  #for the graphs tab
+  observeEvent(input$tableId_row_last_clicked , {
+    
   })
   
   # observeEvent(input$counties, {
@@ -289,40 +403,6 @@ server <- function(input, output, session) {
   #     hideGroup("comorbidities") %>%
   #     showGroup(groupToShow)
   # })
-  
-  observeEvent(input$map_shape_click, {
-    if (input$map_shape_click$group != "marker") {
-      return()
-    }
-    
-    id <- strsplit(input$map_shape_click$id, ", ")[[1]]
-    output$logisticCurve <- renderPlot({
-      subset <- obs[County == id[1] & State == id[2] & Positive]
-      setorder(subset, Updated)
-      subset[, nCases := as.numeric(row.names(subset))]
-      ggplot(subset, aes(x = Updated, y = nCases)) + 
-        geom_step() + 
-        theme_minimal() +
-        scale_y_continuous(name = "Number of Cases") +
-        scale_x_continuous(name = "Date", labels = function(x) {as.Date(as.POSIXct(x, origin = "1970-01-01"))})
-    })
-    
-    
-    
-    output$posRace <- renderPlot({
-      subset <- obs[County == id[1] & State == id[2] & Positive]
-      ggplot(subset, aes(Race)) + 
-        geom_bar() + 
-        theme_minimal()
-    })
-    
-    output$posAge <- renderPlot({
-      subset <- obs[County == id[1] & State == id[2] & Positive]
-      ggplot(subset, aes(Age)) +
-        geom_histogram(bins = 5) +
-        theme_minimal()
-    })
-  })
 }
 
 shinyApp(ui, server)
