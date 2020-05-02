@@ -11,6 +11,7 @@ library(rsconnect)
 library(profvis)
 library(scales)
 library(shinydashboard)
+library(HistogramTools)
 
 
 setwd("/home/ubuntu/covid_vis")
@@ -25,9 +26,7 @@ setwd("/home/ubuntu/covid_vis")
 sidebar <- dashboardSidebar(
   sidebarMenu(
     menuItem("Dashboard", tabName = "maps", icon = icon("dashboard")),
-    #menuItem("Tables", tabName = "tables", icon = icon("th")),
     menuItem("Graphs", tabName = "graphs", icon = icon("th")),
-    #menuItem("Filters", tabName = "filters", icon = icon("th")),
     width = 230
   )
 )
@@ -67,57 +66,47 @@ body <- dashboardBody(
               )
             )
     ),
-    #second dashboard tab content
-    #tabItem(tabName = "tables", 
-            #titlePanel("    All Data"),
-            #fluidRow(
-              #column(12, DTOutput('table'))
-            #)
-    #),
-    #third dashboard tab content
+    #second tab
     tabItem(tabName = "graphs",
             fluidRow(
               titlePanel("      Distributions"),
-              mainPanel(
-                #titlePanel("    All Data"),
+              sidebarPanel(
                 fluidRow(
-                  column(12, DTOutput('table'))
+                  DTOutput('table'),
                 ),
-                #selectInput("State0", 
-                            #"Select a Region",
-                            #choices = c("Tests", "Positive")
-                #),
                 fluidPage(
-                  #sidebarPanel(
-                    column(
-                      6, selectInput("State1", 
-                                  "Select a field to create histograms by age",
-                                  choices = c("Tests", "Positive")
-                      )
-                    ),
-                    column(
-                      6, selectInput("State2", 
-                                  "Select a field to create bar graph by race",
-                                  choices = c("Tests", "Positive")
-                      )
-                    )
-                  #)
+                  sliderInput("bins",
+                              "Number of bins:",
+                              min = 1,
+                              max = 20,
+                              value = 30
+                  ),
+                  selectInput("Graph", 
+                              "Select data display type",
+                              choices = c("Bar/Hist", "Freq")
+                  ),
+                  selectInput("State1", 
+                              "Select a field to create histograms by age",
+                              choices = c("Tests", "Positive")
+                  ),
+                  selectInput("State2", 
+                              "Select a field to create bar graph by race",
+                              choices = c("Tests", "Positive")
+                  ),
                 )
               ),
-              fluidPage(
-                column(
-                  6, plotOutput(outputId = "myhist")
-                ),
-                column(
-                  6, plotOutput(outputId = "bar")
+              mainPanel(
+                fluidPage(
+                  plotOutput(outputId = "myhist"),
+                  br(),
+                  br(),
+                  plotOutput(outputId = "bar"),
                 )
-              )
-            )
+              ),
+         )
     )
   )
 )
-
-
 ui <- dashboardPage( 
   skin="blue",
   dashboardHeader(title = "Covid-19 Dashboard"),
@@ -150,13 +139,12 @@ server <- function(input, output, session) {
     timeFormat = "%b %d %Y, %H:%M"
   )
   
-  
   # TODO: handle the fact that county names are fucked, and that state names are reproduced
   
   output$table <- renderDT(
     #obs, # data
     #only certain columns to display
-    obs %>% select(1, 2, 5, 7, 9),
+    obs %>% select(2, 7, 9, 5),
     class = "display nowrap compact", # style
     filter = "top" # location of column filters
   )
@@ -170,48 +158,100 @@ server <- function(input, output, session) {
   col[which(col==1)] <- "forestgreen"
   
   output$myhist <- renderPlot({
-    if(input$State1 == "Tests"){
-      #hist(AgeTest, main = "Tests by Age")
+    bins<-seq(min(agg$Age), max(agg$Age), length.out = input$bins +1)
+    
+    if(input$State1 == "Tests" && input$Graph =="Bar/Hist"){
+      #ylim<-c(0,1.2*max(agg$Tests))
+      ylim<-c(0,20)
       hist(
         agg$Age, 
         freq=agg$Tests, 
         #col=("yellow", "red", "yellow"), 
         col = col,
         #border= col,
-        breaks = tb,
+        breaks = bins,
         main = "Tests by Age", 
-        xlab="Age")
-    }
+        xlab="Age",
+        labels= TRUE,
+        ylim=ylim
+      )
       
-    if(input$State1 == "Positive"){
-      #hist(AgePos, main = "Cases by Age")
+    }
+    
+    if(input$State1 == "Positive" && input$Graph =="Bar/Hist"){
+      #ylim<-c(0,1.2*max(agg$Positive))
+      ylim<-c(0,12)
       hist(
         agg$Age, 
         freq=agg$Positive, 
-        breaks = tb,
+        breaks = bins,
         #col=("yellow", "red", "yellow"), 
         col = col,
         #border=col,
         main = "Cases by Age", 
-        xlab="Age")
+        xlab="Age",
+        labels = TRUE,
+        ylim=ylim
+      )
       
+    }
+    
+    if(input$State1 == "Tests" && input$Graph =="Freq"){
+      PlotRelativeFrequency(hist(agg$Age, freq=agg$Tests, breaks = bins, col = col, main = "Relative Frequency of Tests by Age", xlab="Age", ylab= "Freq of tests", labels=TRUE, plot=F))
+    }
+    
+    if(input$State1 == "Positive" && input$Graph =="Freq"){
+      PlotRelativeFrequency(hist(agg$Age, freq=agg$Positive, breaks = bins, col = col, main = "Relative Frequency of Cases by Age", xlab="Age", ylab="Freq of cases", labels=TRUE, plot=F))
     }
   })
   
   output$bar <- renderPlot({
-    if(input$State2 == "Tests"){
-      barplot(
+    if(input$State2 == "Tests" && input$Graph =="Bar/Hist"){
+        ylim<-c(0,1.2*max(RaceTest))
+        xx<- barplot(
         RaceTest, 
         main = "Tests per Race", 
-        col = "darkolivegreen1",
+        #col = "darkolivegreen1",
+        col=rainbow(length(RaceTest)),
         ylab= "Count", xlab="Races", 
-        names.arg=c("Black", "White", "Asian")
+        ylim=ylim,
+        names.arg=c("Black", "White", "Asian"),
       )
+      
+      text(x = xx, y = RaceTest, label = RaceTest, pos = 3, cex = 0.8)
       #barplot(agg1$Race, freq=agg1$Tests, main = "Tests per Race", ylab= "Count", xlab="Races", names.arg=c("Black", "White", "Asian"))
     }
-    if(input$State2 == "Positive"){
-      barplot(RacePos, main ="Cases per Race", ylab= "Count", xlab="Races", names.arg=c("Black", "White", "Asian"))
+    if(input$State2 == "Positive" && input$Graph =="Bar/Hist"){
+        ylim<-c(0,1.2*max(RacePos))
+        xx<- barplot(
+        RacePos, 
+        main ="Cases per Race", 
+        col=rainbow(length(RaceTest)),
+        ylab= "Count", 
+        xlab="Races", 
+        ylim=ylim,
+        names.arg=c("Black", "White", "Asian"),
+      )
+      text(x = xx, y = RacePos, label = RacePos, pos = 3, cex = 0.8)
       #barplot(agg1$Race, freq=agg1$Positive, main ="Cases per Race", ylab= "Count", xlab="Races", names.arg=c("Black", "White", "Asian"))
+    }
+    if(input$State2 == "Tests" && input$Graph =="Freq"){
+      slices <- c(RaceTest) 
+      lbls <- c("Black", "White", "Asian")
+      pct <- round(slices/sum(slices)*100)
+      lbls <- paste(lbls, pct) # add percents to labels 
+      lbls <- paste(lbls,"%",sep="") # ad % to labels 
+      pie(slices,labels = lbls, col=rainbow(length(lbls)),
+          main="Tests Given by Race")
+    }
+    if(input$State2 == "Positive" && input$Graph =="Freq"){
+      slices <- c(RacePos) 
+      lbls <- c("Black", "White", "Asian")
+      pct <- round(slices/sum(slices)*100)
+      lbls <- paste(lbls, pct) # add percents to labels 
+      lbls <- paste(lbls,"%",sep="") # ad % to labels 
+      pie(slices,labels = lbls, col=rainbow(length(lbls)),
+          main="Cases by Race")
     }
   })
   
@@ -264,7 +304,6 @@ server <- function(input, output, session) {
   # Race <- obs$Race #number of cases by race bar graph, filter by state, county
   # Age <- obs$Age  #number cases by age histogram, filter by state, county
   
-  
   agg <- obs[, .(Tests = length(Positive), Positive = sum(Positive)), by = .(Age)]
   agg1 <- obs[, .(Tests = length(Positive), Positive = sum(Positive)), by = .(Race)]
   
@@ -272,7 +311,6 @@ server <- function(input, output, session) {
   RaceTest <- agg1[, Tests]
   #AgePos <- agg[, Positive]
   #AgeTest <- agg[, Tests]
-  
   
   # aggregated <- obs[, .(Tests = length(Positive), Positive = sum(Positive)), by = .(County, State)]
   # aggregated[, Location := paste0(County, ", ", State)]
@@ -381,7 +419,18 @@ server <- function(input, output, session) {
   
   #for the graphs tab
   observeEvent(input$tableId_row_last_clicked , {
-    
+    id <- strsplit(input$tableID_row_last_clicked$id, ", ")[[1]]
+    locationObs <- obs[State == id[1]]
+    output$posRace <- renderPlot({
+      ggplot(locationObs, aes(Race)) + 
+        geom_bar() + 
+        theme_minimal()
+    })
+    output$posAge <- renderPlot({
+      ggplot(locationObs, aes(Age)) +
+        geom_histogram(bins = 5) +
+        theme_minimal()
+    })
   })
   
   # observeEvent(input$counties, {
