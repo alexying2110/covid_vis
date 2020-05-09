@@ -14,7 +14,7 @@ library(shinydashboard)
 library(HistogramTools)
 
 
-setwd("/home/ubuntu/covid_vis")
+#setwd("/home/ubuntu/covid_vis")
 # setwd("/home/lofatdairy/code/sialab/covid_vis")
 
 # pop <- fread("our_data/US/census_pop_2019.csv")
@@ -69,38 +69,60 @@ body <- dashboardBody(
     #second tab
     tabItem(tabName = "graphs",
             fluidRow(
-              titlePanel("      Distributions"),
+                titlePanel("      Distributions"),
+                #fluidPage(
+                  #DTOutput('table')
+                #),
+              br(),
               sidebarPanel(
-                fluidRow(
-                  DTOutput('table')
-                ),
                 fluidPage(
+                  checkboxGroupInput("checkbox", 
+                                     label = h3("Data to Display"), 
+                                     choices = c("Age" = 1, "Race" = 2, "Comorbidity" = 3),
+                                     selected = 1
+                                     
+                  ),
+                  br(),
                   sliderInput("bins",
                               "Number of bins:",
                               min = 1,
                               max = 20,
                               value = 30
                   ),
+                  br(),
                   selectInput("Graph", 
                               "Select data display type",
                               choices = c("Bar/Hist", "Freq")
                   ),
+                  br(),
                   selectInput("State1", 
-                              "Select a field to create histograms by age",
-                              choices = c("Tests", "Positive")
+                              "Select a field to create histogram by age",
+                              choices = c("Tested", "Positive")
                   ),
+                  br(),
                   selectInput("State2", 
                               "Select a field to create bar graph by race",
-                              choices = c("Tests", "Positive")
+                              choices = c("Tested", "Positive")
+                  ),
+                  br(),
+                  selectInput("State3", 
+                              "Select a field to create bar graph by comorbidities",
+                              choices = c("Positive", "Recovered")
+                  ),
+                  br(),
+                  fluidRow(
+                    DTOutput('table')
                   )
+                
                 )
               ),
               mainPanel(
                 fluidPage(
                   plotOutput(outputId = "myhist"),
                   br(),
+                  plotOutput(outputId = "bar"),
                   br(),
-                  plotOutput(outputId = "bar")
+                  plotOutput(outputId = "cobar")
                 )
               )
          )
@@ -121,6 +143,8 @@ counties <- readOGR("our_data/US/counties.json")
 countyCenters <- fread("our_data/US/county_centers.csv", key = "Location")
 
 beds <- fread("our_data/US/beds.csv", key = "Location")
+
+comorbidities <- fread("our_data/US/counties.json")
 
 # TODO: have to clean the fucking beds dt jfc
 
@@ -157,92 +181,58 @@ server <- function(input, output, session) {
   col[which(col==2)] <- "darkolivegreen1"
   col[which(col==1)] <- "forestgreen"
   
+  
   output$myhist <- renderPlot({
+    #if(is.null(input$checkbox)||input$checkbox!=1){
+     # return()
+    #}
+    #if(input$checkbox == 1){
     bins<-seq(min(agg$Age), max(agg$Age), length.out = input$bins +1)
     
-    if(input$State1 == "Tests" && input$Graph =="Bar/Hist"){
+    if(input$State1 == "Tested" && input$Graph =="Bar/Hist"){
       #ylim<-c(0,1.2*max(agg$Tests))
       ylim<-c(0,20)
-      hist(
-        agg$Age, 
-        freq=agg$Tests, 
-        #col=("yellow", "red", "yellow"), 
-        col = col,
-        #border= col,
-        breaks = bins,
-        main = "Tests by Age", 
-        xlab="Age",
-        labels= TRUE,
-        ylim=ylim
-      )
-      
+      hist(agg$Age, freq=agg$Tests, col = col, breaks = bins, main = "Tests by Age", xlab="Age", labels= TRUE, ylim=ylim)
     }
     
     if(input$State1 == "Positive" && input$Graph =="Bar/Hist"){
       #ylim<-c(0,1.2*max(agg$Positive))
       ylim<-c(0,12)
-      hist(
-        agg$Age, 
-        freq=agg$Positive, 
-        breaks = bins,
-        #col=("yellow", "red", "yellow"), 
-        col = col,
-        #border=col,
-        main = "Cases by Age", 
-        xlab="Age",
-        labels = TRUE,
-        ylim=ylim
-      )
-      
+      hist(agg$Age, freq=agg$Positive, breaks = bins, col = col,  main = "Cases by Age", xlab="Age", labels = TRUE, ylim=ylim)
     }
     
-    if(input$State1 == "Tests" && input$Graph =="Freq"){
+    if(input$State1 == "Tested" && input$Graph =="Freq"){
       PlotRelativeFrequency(hist(agg$Age, freq=agg$Tests, breaks = bins, col = col, main = "Relative Frequency of Tests by Age", xlab="Age", ylab= "Freq of tests", labels=TRUE, plot=F))
     }
     
     if(input$State1 == "Positive" && input$Graph =="Freq"){
       PlotRelativeFrequency(hist(agg$Age, freq=agg$Positive, breaks = bins, col = col, main = "Relative Frequency of Cases by Age", xlab="Age", ylab="Freq of cases", labels=TRUE, plot=F))
     }
+    #}
   })
   
   output$bar <- renderPlot({
-    if(input$State2 == "Tests" && input$Graph =="Bar/Hist"){
+    #if(is.null(input$checkbox)||input$checkbox!=2){
+     # return()
+    #}
+   # if(input$checkbox==2){
+    if(input$State2 == "Tested" && input$Graph =="Bar/Hist"){
         ylim<-c(0,1.2*max(RaceTest))
-        xx<- barplot(
-        RaceTest, 
-        main = "Tests per Race", 
-        #col = "darkolivegreen1",
-        col=rainbow(length(RaceTest)),
-        ylab= "Count", xlab="Races", 
-        ylim=ylim,
-        names.arg=c("Black", "White", "Asian"),
-      )
-      
-      text(x = xx, y = RaceTest, label = RaceTest, pos = 3, cex = 0.8)
-      #barplot(agg1$Race, freq=agg1$Tests, main = "Tests per Race", ylab= "Count", xlab="Races", names.arg=c("Black", "White", "Asian"))
+        xx<- barplot(RaceTest, main = "Tests per Race", col=rainbow(length(RaceTest)),ylab= "Count", xlab="Races", ylim=ylim, names.arg=c("Black", "White", "Asian"))
+        text(x = xx, y = RaceTest, label = RaceTest, pos = 3, cex = 0.8)
     }
     if(input$State2 == "Positive" && input$Graph =="Bar/Hist"){
         ylim<-c(0,1.2*max(RacePos))
-        xx<- barplot(
-        RacePos, 
-        main ="Cases per Race", 
-        col=rainbow(length(RaceTest)),
-        ylab= "Count", 
-        xlab="Races", 
-        ylim=ylim,
-        names.arg=c("Black", "White", "Asian"),
-      )
-      text(x = xx, y = RacePos, label = RacePos, pos = 3, cex = 0.8)
-      #barplot(agg1$Race, freq=agg1$Positive, main ="Cases per Race", ylab= "Count", xlab="Races", names.arg=c("Black", "White", "Asian"))
+        xx<- barplot(RacePos, main ="Cases per Race", col=rainbow(length(RaceTest)), ylab= "Count", xlab="Races", ylim=ylim, names.arg=c("Black", "White", "Asian"))
+        text(x = xx, y = RacePos, label = RacePos, pos = 3, cex = 0.8)
     }
-    if(input$State2 == "Tests" && input$Graph =="Freq"){
+    if(input$State2 == "Tested" && input$Graph =="Freq"){
       slices <- c(RaceTest) 
       lbls <- c("Black", "White", "Asian")
       pct <- round(slices/sum(slices)*100)
       lbls <- paste(lbls, pct) # add percents to labels 
       lbls <- paste(lbls,"%",sep="") # ad % to labels 
-      pie(slices,labels = lbls, col=rainbow(length(lbls)),
-          main="Tests Given by Race")
+      pie(slices,labels = lbls, col=rainbow(length(lbls)), main="Tests Given by Race")
     }
     if(input$State2 == "Positive" && input$Graph =="Freq"){
       slices <- c(RacePos) 
@@ -250,11 +240,46 @@ server <- function(input, output, session) {
       pct <- round(slices/sum(slices)*100)
       lbls <- paste(lbls, pct) # add percents to labels 
       lbls <- paste(lbls,"%",sep="") # ad % to labels 
-      pie(slices,labels = lbls, col=rainbow(length(lbls)),
-          main="Cases by Race")
+      pie(slices,labels = lbls, col=rainbow(length(lbls)), main="Cases by Race")
     }
+    #}
   })
   
+  output$cobar <- renderPlot({
+    #if(is.null(input$checkbox)||input$checkbox!=3){
+     # return()
+    #}
+    #if(input$checkbox==3){
+    if(input$State3 == "Positive" && input$Graph =="Bar/Hist"){
+      ylim<-c(0,1.2*max(RaceTest))
+      xx<- barplot(RaceTest, main = "Cases per Comorbidity", col=rainbow(length(RaceTest)), ylab= "Count", xlab="Races", ylim=ylim, names.arg=c("Diabetes", "Hypertension", "Cardiovascular disease"))
+      text(x = xx, y = RaceTest, label = RaceTest, pos = 3, cex = 0.8)
+    }
+    if(input$State3 == "Recovered" && input$Graph =="Bar/Hist" ){
+      ylim<-c(0,1.2*max(RaceTest))
+      xx<- barplot(RaceTest, main = "Recoveries by Comorbidity", col=rainbow(length(RaceTest)),ylab= "Count", xlab="Races", ylim=ylim,names.arg=c("Diabetes", "Hypertension", "Cardiovascular disease"))
+      text(x = xx, y = RaceTest, label = RaceTest, pos = 3, cex = 0.8)
+    }
+    if(input$State3 == "Positive" && input$Graph =="Freq"){
+      slices <- c(RaceTest) 
+      lbls <- c("Diabetes", "Hypertension", "Cardiovascular disease")
+      pct <- round(slices/sum(slices)*100)
+      lbls <- paste(lbls, pct) # add percents to labels 
+      lbls <- paste(lbls,"%",sep="") # ad % to labels 
+      pie(slices,labels = lbls, col=rainbow(length(lbls)), main="Percent of Cases")
+    }
+    if(input$State3 == "Recovered" && input$Graph =="Freq"){
+      slices <- c(RaceTest) 
+      lbls <- c("Diabetes", "Hypertension", "Cardiovascular disease")
+      pct <- round(slices/sum(slices)*100)
+      lbls <- paste(lbls, pct) # add percents to labels 
+      lbls <- paste(lbls,"%",sep="") # ad % to labels 
+      pie(slices,labels = lbls, col=rainbow(length(lbls)), main="Percent Recovered")
+    }
+   # }
+  })
+  
+
   pal = colorBin(colorRamp(c("#ff0000", "#00ff00")), domain = NULL, bins = 20)
   output$map <- renderLeaflet({
     leaflet(counties) %>%
