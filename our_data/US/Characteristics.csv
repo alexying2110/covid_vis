@@ -1,0 +1,38 @@
+Characteristics of COVID-Associated Hospitalizations (data downloaded on 5/16/2020)
+YEAR,CHARACTERTISTIC,AGE,GROUP,COUNT,PERCENT
+2020,Race/Ethnicity,0-4 yr,Non-Hispanic White,7,24.1
+2020,Race/Ethnicity,0-4 yr,Non-Hispanic Black,9,31.0
+2020,Race/Ethnicity,0-4 yr,Hispanic,7,24.1
+2020,Race/Ethnicity,0-4 yr,Other,6,20.7
+2020,Sex,0-4 yr,Male,32,55.2
+2020,Sex,0-4 yr,Female,26,44.8
+2020,Race/Ethnicity,5-17 yr,Non-Hispanic White,8,17.4
+2020,Race/Ethnicity,5-17 yr,Non-Hispanic Black,16,34.8
+2020,Race/Ethnicity,5-17 yr,Hispanic,19,41.3
+2020,Race/Ethnicity,5-17 yr,Other,3,6.5
+2020,Sex,5-17 yr,Male,33,44.6
+2020,Sex,5-17 yr,Female,41,55.4
+2020,Race/Ethnicity,18-49 yr,Non-Hispanic White,568,19.0
+2020,Race/Ethnicity,18-49 yr,Non-Hispanic Black,1165,39.0
+2020,Race/Ethnicity,18-49 yr,Hispanic,898,30.1
+2020,Race/Ethnicity,18-49 yr,Other,356,11.9
+2020,Sex,18-49 yr,Male,2532,54.0
+2020,Sex,18-49 yr,Female,2157,46.0
+2020,Race/Ethnicity,50-64 yr,Non-Hispanic White,1159,29.4
+2020,Race/Ethnicity,50-64 yr,Non-Hispanic Black,1780,45.1
+2020,Race/Ethnicity,50-64 yr,Hispanic,616,15.6
+2020,Race/Ethnicity,50-64 yr,Other,392,9.9
+2020,Sex,50-64 yr,Male,3315,56.7
+2020,Sex,50-64 yr,Female,2529,43.3
+2020,Race/Ethnicity,65+ yr,Non-Hispanic White,3166,49.2
+2020,Race/Ethnicity,65+ yr,Non-Hispanic Black,2402,37.3
+2020,Race/Ethnicity,65+ yr,Hispanic,366,5.7
+2020,Race/Ethnicity,65+ yr,Other,498,7.7
+2020,Sex,65+ yr,Male,4463,49.9
+2020,Sex,65+ yr,Female,4486,50.1
+2020,Race/Ethnicity,Overall,Non-Hispanic White,4908,36.5
+2020,Race/Ethnicity,Overall,Non-Hispanic Black,5372,40.0
+2020,Race/Ethnicity,Overall,Hispanic,1906,14.2
+2020,Race/Ethnicity,Overall,Other,1255,9.3
+2020,Sex,Overall,Male,10375,52.9
+2020,Sex,Overall,Female,9239,47.1

@@ -12,7 +12,8 @@ library(profvis)
 library(scales)
 library(shinydashboard)
 library(HistogramTools)
-
+library(shinyWidgets)
+library(ggplot2)
 
 #setwd("/home/ubuntu/covid_vis")
 # setwd("/home/lofatdairy/code/sialab/covid_vis")
@@ -70,50 +71,43 @@ body <- dashboardBody(
     tabItem(tabName = "graphs",
             fluidRow(
                 titlePanel("      Distributions"),
-                #fluidPage(
+                fluidPage(
+                  DTOutput('table')
+                ),
+              sidebarPanel(
+                #fluidRow(
                   #DTOutput('table')
                 #),
-              br(),
-              sidebarPanel(
                 fluidPage(
-                  checkboxGroupInput("checkbox", 
-                                     label = h3("Data to Display"), 
-                                     choices = c("Age" = 1, "Race" = 2, "Comorbidity" = 3),
-                                     selected = 1
-                                     
-                  ),
+                  #br()
                   br(),
+                  selectInput("State1", 
+                              "Select a field to create histogram by age",
+                              choices = c("Tested", "Positive")
+                  ),
+                  
+                  #br(),
                   sliderInput("bins",
                               "Number of bins:",
                               min = 1,
                               max = 20,
                               value = 30
                   ),
-                  br(),
-                  selectInput("Graph", 
-                              "Select data display type",
-                              choices = c("Bar/Hist", "Freq")
-                  ),
-                  br(),
-                  selectInput("State1", 
-                              "Select a field to create histogram by age",
-                              choices = c("Tested", "Positive")
-                  ),
-                  br(),
+                  radioButtons("Graph1", "Display data type", choices = c("Counts", "Freq")),
+                  br(), br(),br(),br(), br(), br(), br(),br(),br(),br(),
                   selectInput("State2", 
                               "Select a field to create bar graph by race",
                               choices = c("Tested", "Positive")
                   ),
-                  br(),
+                  radioButtons("Graph2", "Display data type", choices = c("Counts", "Freq")),
+                  br(),br(),br(),br(),br(),br(),br(),br(),br(),br(),br(),br(),br(),br(),br(),
                   selectInput("State3", 
-                              "Select a field to create bar graph by comorbidities",
-                              choices = c("Positive", "Recovered")
+                      "Comorbidity data", 
+                      choices = list("Pediatric", "Adult", "All", "All-Stacked"),
+                      #selected = "Pediatric"
                   ),
-                  br(),
-                  fluidRow(
-                    DTOutput('table')
-                  )
-                
+                  radioButtons("Graph3", "Display data type", choices = c("Counts", "Freq")),
+                  br(),br(),br(),br(),br()
                 )
               ),
               mainPanel(
@@ -151,6 +145,10 @@ comorbidities <- fread("our_data/US/counties.json")
 server <- function(input, output, session) {
   obs <- fread("our_data/test/test.csv")
   
+  #age and comorbidity
+  comorbs <- fread("our_data/US/Medical_Conditions.csv")
+  chars <- fread("our_data/US/Characteristics.csv")
+  
   # Round to nearest 5 minute
   updateMax <- ceiling(max(obs$Updated) / 300) * 300
   updateMin <- floor(min(obs$Updated) / 300) * 300
@@ -166,8 +164,6 @@ server <- function(input, output, session) {
   # TODO: handle the fact that county names are fucked, and that state names are reproduced
   
   output$table <- renderDT(
-    #obs, # data
-    #only certain columns to display
     obs %>% select(2, 7, 9, 5),
     class = "display nowrap compact", # style
     filter = "top" # location of column filters
@@ -189,23 +185,23 @@ server <- function(input, output, session) {
     #if(input$checkbox == 1){
     bins<-seq(min(agg$Age), max(agg$Age), length.out = input$bins +1)
     
-    if(input$State1 == "Tested" && input$Graph =="Bar/Hist"){
-      #ylim<-c(0,1.2*max(agg$Tests))
+    if(input$State1 == "Tested" && input$Graph1 =="Counts"){
+      ylim<-c(0,1.2*max(agg$Tests))
       ylim<-c(0,20)
       hist(agg$Age, freq=agg$Tests, col = col, breaks = bins, main = "Tests by Age", xlab="Age", labels= TRUE, ylim=ylim)
     }
     
-    if(input$State1 == "Positive" && input$Graph =="Bar/Hist"){
-      #ylim<-c(0,1.2*max(agg$Positive))
+    if(input$State1 == "Positive" && input$Graph1 =="Counts"){
+      ylim<-c(0,1.2*max(agg$Positive))
       ylim<-c(0,12)
       hist(agg$Age, freq=agg$Positive, breaks = bins, col = col,  main = "Cases by Age", xlab="Age", labels = TRUE, ylim=ylim)
     }
     
-    if(input$State1 == "Tested" && input$Graph =="Freq"){
+    if(input$State1 == "Tested" && input$Graph1 =="Freq"){
       PlotRelativeFrequency(hist(agg$Age, freq=agg$Tests, breaks = bins, col = col, main = "Relative Frequency of Tests by Age", xlab="Age", ylab= "Freq of tests", labels=TRUE, plot=F))
     }
     
-    if(input$State1 == "Positive" && input$Graph =="Freq"){
+    if(input$State1 == "Positive" && input$Graph1 =="Freq"){
       PlotRelativeFrequency(hist(agg$Age, freq=agg$Positive, breaks = bins, col = col, main = "Relative Frequency of Cases by Age", xlab="Age", ylab="Freq of cases", labels=TRUE, plot=F))
     }
     #}
@@ -216,17 +212,17 @@ server <- function(input, output, session) {
      # return()
     #}
    # if(input$checkbox==2){
-    if(input$State2 == "Tested" && input$Graph =="Bar/Hist"){
+    if(input$State2 == "Tested" && input$Graph2 =="Counts"){
         ylim<-c(0,1.2*max(RaceTest))
         xx<- barplot(RaceTest, main = "Tests per Race", col=rainbow(length(RaceTest)),ylab= "Count", xlab="Races", ylim=ylim, names.arg=c("Black", "White", "Asian"))
         text(x = xx, y = RaceTest, label = RaceTest, pos = 3, cex = 0.8)
     }
-    if(input$State2 == "Positive" && input$Graph =="Bar/Hist"){
+    if(input$State2 == "Positive" && input$Graph2 =="Counts"){
         ylim<-c(0,1.2*max(RacePos))
         xx<- barplot(RacePos, main ="Cases per Race", col=rainbow(length(RaceTest)), ylab= "Count", xlab="Races", ylim=ylim, names.arg=c("Black", "White", "Asian"))
         text(x = xx, y = RacePos, label = RacePos, pos = 3, cex = 0.8)
     }
-    if(input$State2 == "Tested" && input$Graph =="Freq"){
+    if(input$State2 == "Tested" && input$Graph2 =="Freq"){
       slices <- c(RaceTest) 
       lbls <- c("Black", "White", "Asian")
       pct <- round(slices/sum(slices)*100)
@@ -234,7 +230,7 @@ server <- function(input, output, session) {
       lbls <- paste(lbls,"%",sep="") # ad % to labels 
       pie(slices,labels = lbls, col=rainbow(length(lbls)), main="Tests Given by Race")
     }
-    if(input$State2 == "Positive" && input$Graph =="Freq"){
+    if(input$State2 == "Positive" && input$Graph2 =="Freq"){
       slices <- c(RacePos) 
       lbls <- c("Black", "White", "Asian")
       pct <- round(slices/sum(slices)*100)
@@ -246,37 +242,55 @@ server <- function(input, output, session) {
   })
   
   output$cobar <- renderPlot({
-    #if(is.null(input$checkbox)||input$checkbox!=3){
-     # return()
-    #}
-    #if(input$checkbox==3){
-    if(input$State3 == "Positive" && input$Graph =="Bar/Hist"){
-      ylim<-c(0,1.2*max(RaceTest))
-      xx<- barplot(RaceTest, main = "Cases per Comorbidity", col=rainbow(length(RaceTest)), ylab= "Count", xlab="Races", ylim=ylim, names.arg=c("Diabetes", "Hypertension", "Cardiovascular disease"))
-      text(x = xx, y = RaceTest, label = RaceTest, pos = 3, cex = 0.8)
+    if(input$State3 == "Pediatric" && input$Graph3 =="Counts"){
+      ylim<-c(0,1.2*max(Cmorbs))
+      xx<- barplot(Cmorbs, main = "Child Comorbidities", col=rainbow(length(Cmorbs)),ylim=ylim, ylab= "Count", xlab="Comorbidities", names.arg=c(morbs$Condition))
+      text(x=xx, y=Cmorbs, label=Cmorbs, pos=3, cex=0.8)
     }
-    if(input$State3 == "Recovered" && input$Graph =="Bar/Hist" ){
-      ylim<-c(0,1.2*max(RaceTest))
-      xx<- barplot(RaceTest, main = "Recoveries by Comorbidity", col=rainbow(length(RaceTest)),ylab= "Count", xlab="Races", ylim=ylim,names.arg=c("Diabetes", "Hypertension", "Cardiovascular disease"))
-      text(x = xx, y = RaceTest, label = RaceTest, pos = 3, cex = 0.8)
+    if(input$State3 == "Adult" && input$Graph3 =="Counts" ){
+      ylim<-c(0,1.2*max(Amorbs))
+      xx<- barplot(Amorbs, main = "Adult Comorbidities", col=rainbow(length(Amorbs)),ylim=ylim, ylab= "Count", xlab="Comorbidities", names.arg=c(morbs$Condition))
+      text(x = xx, y = Amorbs, label = Amorbs, pos = 3, cex = 0.8)
     }
-    if(input$State3 == "Positive" && input$Graph =="Freq"){
-      slices <- c(RaceTest) 
-      lbls <- c("Diabetes", "Hypertension", "Cardiovascular disease")
+    if(input$State3 == "All" && input$Graph3 =="Counts" ){
+      
+      
+      ylim<-c(0,1.2*max(count))
+      xx<- barplot(count, main = "All Comorbidities", col=rainbow(length(count)),ylim=ylim, ylab= "Count", xlab="Comorbidities", names.arg=c(morbs$Condition))
+      
+      text(x = xx, y = count, label = count, pos = 3, cex = 0.8)
+    }
+    if(input$State3 == "All-Stacked" && input$Graph3 =="Counts" ){
+    counts<-table(morbs$Child, morbs$Adult)
+    xx<- barplot(counts, main = "All Comorbidities", xlab="Comorbidities", col=c("darkblue", "red"),
+                 legend = rownames(counts))
+    }
+    if(input$State3 == "Pediatric" && input$Graph3 =="Freq"){
+      slices <- c(Cpercentmorbs) 
+      lbls <- c(morbs$Condition)
       pct <- round(slices/sum(slices)*100)
       lbls <- paste(lbls, pct) # add percents to labels 
       lbls <- paste(lbls,"%",sep="") # ad % to labels 
-      pie(slices,labels = lbls, col=rainbow(length(lbls)), main="Percent of Cases")
+      pie(slices,labels = lbls, col=rainbow(length(lbls)), main="Pediatric Cases")
     }
-    if(input$State3 == "Recovered" && input$Graph =="Freq"){
-      slices <- c(RaceTest) 
-      lbls <- c("Diabetes", "Hypertension", "Cardiovascular disease")
+    if(input$State3 == "Adult" && input$Graph3 =="Freq"){
+      slices <- c(Apercentmorbs) 
+      lbls <- c(morbs$Condition)
       pct <- round(slices/sum(slices)*100)
       lbls <- paste(lbls, pct) # add percents to labels 
       lbls <- paste(lbls,"%",sep="") # ad % to labels 
-      pie(slices,labels = lbls, col=rainbow(length(lbls)), main="Percent Recovered")
+      pie(slices,labels = lbls, col=rainbow(length(lbls)), main="Adult Cases")
     }
-   # }
+    if(input$State3 == "All" && input$Graph3 =="Freq"){
+      slices <- c(percentmorbs) 
+      lbls <- c(morbs$Condition)
+      pct <- round(slices/sum(slices)*100)
+      lbls <- paste(lbls, pct) # add percents to labels 
+      lbls <- paste(lbls,"%",sep="") # ad % to labels 
+      pie(slices,labels = lbls, col=rainbow(length(lbls)), main="All Cases")
+    }
+    
+    
   })
   
 
@@ -331,11 +345,19 @@ server <- function(input, output, session) {
   
   agg <- obs[, .(Tests = length(Positive), Positive = sum(Positive)), by = .(Age)]
   agg1 <- obs[, .(Tests = length(Positive), Positive = sum(Positive)), by = .(Race)]
+  morbs <- comorbs[, .(Child = CHILDREN, Adult=ADULTS, Condition = CONDITION, percentChild=CHILDRENPERCENT, percentAdult = ADULTSPERCENT, totalCount = CHILDREN+ADULTS), by = .(CONDITION)]
+ 
+  count<- morbs[, totalCount]
+  Cmorbs <-morbs[, Child]
+  Amorbs <-morbs[, Adult]
+  
+  Cpercentmorbs<-morbs[, percentChild]
+  Apercentmorbs<-morbs[, percentAdult]
+  percentmorbs<-morbs[, totalCount]
   
   RacePos<-agg1[, Positive]
   RaceTest <- agg1[, Tests]
-  #AgePos <- agg[, Positive]
-  #AgeTest <- agg[, Tests]
+  
   
   # aggregated <- obs[, .(Tests = length(Positive), Positive = sum(Positive)), by = .(County, State)]
   # aggregated[, Location := paste0(County, ", ", State)]
