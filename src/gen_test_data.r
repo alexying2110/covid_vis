@@ -27,4 +27,9 @@ testObs$Race <- ifelse(runif(nObs) < .75, "White", ifelse(runif(200) < .6, "Blac
 testObs$Hispanic <- runif(nObs) < .12
 testObs$Age <- floor(rnorm(nObs, 48, 12))
 
+testObs$Diabetes <- runif(nObs) < .25
+testObs$Obesity <- runif(nObs) < .41
+testObs$Hypertension <- runif(nObs) < .72
+testObs$COPD <- runif(nObs) < .40
+
 fwrite(testObs, file = "./our_data/test/test.csv")

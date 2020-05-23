@@ -1,5 +1,6 @@
 library(leaflet)
 library(data.table)
+library(htmlwidgets)
 setwd("/home/lofatdairy/code/sialab/covid_vis")
 obs <- fread("our_data/test/test.csv")
 countyCenters <- fread("our_data/US/county_centers.csv", key = "Location")
@@ -9,8 +10,10 @@ setkey(aggregated, Location)
 aggregated[, Markers := Tests]
 aggregated$Lat <- countyCenters[aggregated$Location, Lat]
 aggregated$Long <- countyCenters[aggregated$Location, Long]
-
-leaflet() %>% 
+#counties <- readOGR("our_data/US/counties.json")
+#counties$cases <- aggregated[counties$Location, counties$]
+leaflet() %>% addTiles() %>%
+  addProviderTiles(providers$CartoDB.DarkMatterNoLabels) %>%
   onRender("
     function(el, x, data) {
       for (let i = 0; i < data.Long.length; i++) {
@@ -18,3 +21,4 @@ leaflet() %>%
       }
     }
   ", data = aggregated)
+
