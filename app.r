@@ -18,7 +18,7 @@ library(HistogramTools)
 library(shinyWidgets)
 library(ggplot2)
 
-#setwd("/home/ubuntu/covid_vis")
+setwd("/home/ubuntu/covid_vis")
 # setwd("/home/lofatdairy/code/sialab/covid_vis")
 
 # pop <- fread("our_data/US/census_pop_2019.csv")
@@ -44,7 +44,6 @@ body <- dashboardBody(
             titlePanel("    Map"),
             fluidRow(
               useShinyjs(),
-              extendShinyjs(script = "./map.js"),
               sidebarPanel(
                 sliderInput("time", 
                           label = h3("Time"), 
@@ -117,7 +116,7 @@ body <- dashboardBody(
                   selectInput(inputId = "location3", label = ("Location to Filter by"),
                               choices = unique(states$State)
                   ),
-                  br(),br(),br(),
+                  br(),br(),br()
                 )
               ),
               mainPanel(
