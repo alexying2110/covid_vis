@@ -18,8 +18,8 @@ library(HistogramTools)
 library(shinyWidgets)
 library(ggplot2)
 
-setwd("/home/ubuntu/covid_vis")
-# setwd("/home/lofatdairy/code/sialab/covid_vis")
+# setwd("/home/ubuntu/covid_vis")
+setwd("/home/lofatdairy/code/sialab/covid_vis")
 
 # pop <- fread("our_data/US/census_pop_2019.csv")
 # pop$CTYNAME[1835] <- "Dona Ana County"
@@ -146,7 +146,7 @@ countyCenters <- fread("our_data/US/county_centers.csv", key = "Location")
 
 beds <- fread("our_data/US/beds.csv", key = "Location")
 
-comorbidities <- fread("our_data/US/counties.json")
+#comorbidities <- fread("our_data/US/counties.json")
 
 # TODO: have to clean the fucking beds dt jfc
 
