@@ -2,6 +2,7 @@ library(shiny)
 library(leaflet)
 library(leaflet.extras)
 library(rgdal)
+library(readr)
 library(dplyr)
 library(shinyjs)
 library(htmlwidgets)
@@ -132,6 +133,7 @@ body <- dashboardBody(
     )
   )
 )
+
 ui <- dashboardPage( 
   skin="blue",
   dashboardHeader(title = "Covid-19 Dashboard"),
@@ -139,8 +141,6 @@ ui <- dashboardPage(
   body
 )
     
-pal <- colorBin(colorRamp(c("#FFDD00","#FF0000")), domain = NULL, bins = 10)
-
 counties <- readOGR("our_data/US/counties.json")
 
 countyCenters <- fread("our_data/US/county_centers.csv", key = "Location")
@@ -153,6 +153,9 @@ comorbidities <- fread("our_data/US/counties.json")
 
 server <- function(input, output, session) {
   obs <- fread("our_data/test/test.csv")
+  maxObs <- obs[, .(Tests = length(Positive), Positive = sum(Positive)), by = .(County, State)]
+  MAX_TESTS <- max(maxObs$Tests)
+  MAX_POS <- max(maxObs$Positive)
   observe({
     invalidateLater(5 * 60 * 1000, session)
     obs <- fread("our_data/test/test.csv")
@@ -234,6 +237,7 @@ server <- function(input, output, session) {
       }
     })
   })
+  
   observeEvent(input$location2, {
     output$bar <- renderPlot({
       locPos <- obs[State == State & Positive] #positive cases
@@ -273,13 +277,11 @@ server <- function(input, output, session) {
     })
   })
   
-  
   output$table <- renderDT(
     obs %>% select(2, 7, 9, 5),
     class = "display nowrap compact", # style
     filter = "top" # location of column filters
   )
-  
   
    #output$myhist <- renderPlot({
     #bins<-seq(min(agg$Age), max(agg$Age), length.out = input$bins +1)
@@ -344,6 +346,7 @@ server <- function(input, output, session) {
       #barplot(count, main = "All Comorbidities", xlab = "Comorbidities", ylab = "Count", col = c("blue", "green"), names.arg=c(morbs$Condition))
       #legend("topleft", c("Pediatric", "Adult"), fill = c("blue", "green"))
     }
+    
     #FIXXXXXXXXX
     if(input$State3 == "All-Stacked" && input$Graph3 =="Counts" ){
       #counts<-table(morbs$Condition, stacked)
@@ -422,98 +425,63 @@ server <- function(input, output, session) {
     }
   })
   
-  
-  pal = colorBin(colorRamp(c("#ff0000", "#00ff00")), domain = NULL, bins = 20)
   output$map <- renderLeaflet({
     leaflet(counties) %>%
       addProviderTiles(providers$CartoDB.DarkMatterNoLabels) %>%
       setView(lng = -97, lat = 39, zoom = 3) %>%
-      # addPolygons(stroke = FALSE,
-      #             smoothFactor = 0.3,
-      #             color = ~pal(as.numeric(beds)),
-      #             label = ~paste0(NAME, ", ", STATENAME),
-      #             group = "population"
-      # ) %>%
-      addPolygons(stroke = FALSE,
-                  smoothFactor = 0.3,
-                  color = ~pal(log10(as.numeric(beds + 1))),
-                  label = ~paste0(NAME, ", ", STATENAME),
-                  group = "beds",
-                  layerId = ~paste0(NAME, ", ", STATENAME),
-                  popup = ~paste0(
-                    ifelse(STATENAME == '', as.character(NAME), Location),
-                    "<br>Population: ",          "Not yet implemented",
-                    "<br>Elderly Population: ",  "Not yet implemented",
-                    "<br>Total hospital beds: ", beds,
-                    "<br>Smoking Population: ",  "Not yet implemented",
-                    "<br> Last Updated: ",       "Not yet implemented"
-                  )
-      )
+      onRender('
+        function(el, x, data) {
+          let geoObj = JSON.parse(data);
+          let counties = geoObj.features;
+          countyLayer = L.geoJSON(counties, {
+            style: {
+              weight: 0.5,
+              opacity: 0.7,
+              fillOpacity: 0.5
+            }
+          });
+          
+          Shiny.addCustomMessageHandler("updateColors", 
+            function(aggregated) {
+              countyLayer.eachLayer(function(layer) {
+                let ind = aggregated.Location.indexOf(layer.feature.properties.Location);
+                if (ind > 0) {
+                  layer.setStyle({color: aggregated.Markers[ind]})
+                } else {
+                  layer.setStyle({color: "#00aa00"})
+                }
+              });
+          });
+          countyLayer.addTo(this);
+        }
+      ', data = read_file("our_data/US/counties.json"))
   })
 
-  # for histogram
-  # County <- obs$County 
-  # State <- obs$State
-  # Lat <- obs$Lat
-  # Long <- obs$Long
-  # Positive <- obs$Positive
-  # Race <- obs$Race #number of cases by race bar graph, filter by state, county
-  # Age <- obs$Age  #number cases by age histogram, filter by state, county
-  
-  
-  
-  # aggregated <- obs[, .(Tests = length(Positive), Positive = sum(Positive)), by = .(County, State)]
-  # aggregated[, Location := paste0(County, ", ", State)]
-  # setkey(aggregated, Location)
-
-  # counties$pop <- pop[paste0(counties$NAME, ", ", counties$STATENAME), POPESTIMATE2019]
-  
   observeEvent(c(input$time, input$markers), {
     unixTime <- as.numeric(input$time)
     if (unixTime == 0) {
       return(NULL)
     }
+    
     aggregated <- obs[Updated < unixTime, .(Tests = length(Positive), Positive = sum(Positive)), by = .(County, State)]
     aggregated[, Location := paste0(County, ", ", State)]
     setkey(aggregated, Location)
+    
+    pal = colorBin(colorRamp(c("#ffff00", "#ff0000")), domain = c(0:1), bins = 20)
+    print(log10(aggregated$Tests) / log10(MAX_TESTS))
+    
     if (input$markers == "Tests") {
-      aggregated[, Markers := Tests]
+      aggregated[, Markers := pal(log10(Tests)/log10(MAX_TESTS))]
     }
     if (input$markers == "Cases") {
-      aggregated[, Markers := Positive]
+      aggregated <- aggregated[Positive > 0,]
+      aggregated[, Markers := pal(log10(Positive)/log10(MAX_POS))]
     }
     if (input$markers == "Cases Per Capita") {
-      aggregated[, Markers := Tests]
+      aggregated[, Markers := pal(Tests)]
     }
-    aggregated$Lat <- countyCenters[aggregated$Location, Lat]
-    aggregated$Long <- countyCenters[aggregated$Location, Long]
-    leafletProxy("map", data = aggregated) %>%
-      # clearGroup(group = "marker") %>%
-      # addCircleMarkers(
-      #            lng = ~Long, 
-      #            lat = ~Lat, 
-      #            layerId = ~Location,
-      #            radius = ~log10(Markers) * 5,
-      #            opacity = 0.6,
-      #            color = ~ifelse(input$markers == "Tests", "#FFDD00", "#FF0000"),
-      #            stroke = T, 
-      #            weight = 0.8,
-      #            group = "marker",
-      #            label = ~ifelse(State == '', as.character(County), Location),
-      #            popup = ~paste0(
-      #              ifelse(State == '', as.character(County), Location),
-      #              "<br># Positive: ",          eval(Positive),
-      #              "<br># Tested: ",            eval(Tests),
-      #              "<br>Population: ",          "Not yet implemented",
-      #              "<br>Elderly Population: ",  "Not yet implemented",
-      #              "<br>Total hospital beds: ", "Not yet implemented",
-      #              "<br>Smoking Population: ",  "Not yet implemented",
-      #              "<br> Last Updated: ",       "Not yet implemented"
-      #            ) %>%
-      # )
-      onRender("
-        function(el,x) {console.log('ran')}
-               ")
+    
+    session$sendCustomMessage(type = "updateColors", aggregated)
   })
   
   observeEvent(input$map_shape_click, {
@@ -567,7 +535,6 @@ server <- function(input, output, session) {
         scale_x_continuous(name = "Date", labels = function(x) {as.Date(as.POSIXct(x, origin = "1970-01-01"))})
     })
   })
-  
   
   #for the graphs tab
   observeEvent(input$tableId_row_last_clicked , {

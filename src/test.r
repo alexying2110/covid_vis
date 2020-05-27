@@ -1,6 +1,9 @@
+library(readr)
 library(leaflet)
+library(rgdal)
 library(data.table)
 library(htmlwidgets)
+library(profvis)
 setwd("/home/lofatdairy/code/sialab/covid_vis")
 obs <- fread("our_data/test/test.csv")
 countyCenters <- fread("our_data/US/county_centers.csv", key = "Location")
@@ -10,15 +13,47 @@ setkey(aggregated, Location)
 aggregated[, Markers := Tests]
 aggregated$Lat <- countyCenters[aggregated$Location, Lat]
 aggregated$Long <- countyCenters[aggregated$Location, Long]
-#counties <- readOGR("our_data/US/counties.json")
+counties <- readOGR("our_data/US/counties.json")
 #counties$cases <- aggregated[counties$Location, counties$]
-leaflet() %>% addTiles() %>%
-  addProviderTiles(providers$CartoDB.DarkMatterNoLabels) %>%
-  onRender("
-    function(el, x, data) {
-      for (let i = 0; i < data.Long.length; i++) {
-        L.circleMarker([data.Lat[i], data.Long[i]], {radius:3}).addTo(this);
-      }
-    }
-  ", data = aggregated)
+ui <- fluidPage(
+  titlePanel("Laeflet JS Test"),
+  mainPanel(leafletOutput(outputId = "map"))
+)
 
+server <- function(input, output, session) {
+  output$map <- renderLeaflet({
+    leaflet() %>% addTiles() %>%
+      addProviderTiles(providers$CartoDB.DarkMatterNoLabels) %>%
+      onRender('
+        function(el, x, data) {
+          let geoObj = JSON.parse(data);
+          let counties = geoObj.features;
+          L.geoJSON(counties).addTo(this);
+        }
+      ', data = read_file("~/code/sialab/covid_vis/our_data/US/counties.json"))
+  })
+  
+  observe({
+    session$sendCustomMessage(type = "updateColors", input)
+  })
+}
+
+shinyApp(ui, server)
+profvis({
+    leaflet() %>% addTiles() %>%
+      addProviderTiles(providers$CartoDB.DarkMatterNoLabels) %>%
+      onRender('
+        function(el, x, data) {
+          let geoObj = JSON.parse(data);
+          let counties = geoObj.features;
+          L.geoJSON(counties).addTo(this);
+        }
+      ', data = read_file("~/code/sialab/covid_vis/our_data/US/counties.json"))
+ 
+})
+
+profvis({
+  leaflet(counties) %>% addTiles() %>%
+      addProviderTiles(providers$CartoDB.DarkMatterNoLabels) %>%
+      addPolygons()
+})
