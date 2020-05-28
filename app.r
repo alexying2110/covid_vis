@@ -54,8 +54,8 @@ body <- dashboardBody(
                           animate = animationOptions(interval = 100, loop = T),
                           ticks = T
                 ),
-                radioButtons("markers", label = h3("Placeholder"), choices = c("Cases", "Tests", "Cases Per Capita")),
-                radioButtons("counties", label = h3("Placeholder 2"), choices = c("Population", "Beds", "Elderly Population", "Comorbidities"))
+                #radioButtons("counties", label = h3("Placeholder 2"), choices = c("Population", "Beds", "Elderly Population", "Comorbidities")),
+                radioButtons("markers", label = h3("Display"), choices = c("Cases", "Tests")),
               ),
               mainPanel(
                 leafletOutput(outputId = "map")
@@ -177,7 +177,6 @@ server <- function(input, output, session) {
   )
   
   # TODO: handle the fact that county names are fucked, and that state names are reproduced
-  
   
   agg <- obs[, .(Tests = length(Positive), Positive = sum(Positive)), by = .(Age)]
   agg1 <- obs[, .(Tests = length(Positive), Positive = sum(Positive)), by = .(Race)]
@@ -440,6 +439,20 @@ server <- function(input, output, session) {
             }
           });
           
+          countyLayer.eachLayer(function(layer) {
+            layer.on("click", function(ev) {
+              Shiny.onInputChange("map_shape_click", {id: layer.feature.properties.Location})
+            });
+            layer.bindTooltip(layer.feature.properties.Location)
+            layer.on("mouseover", function(ev) {
+              layer.openTooltip();
+            });
+            layer.on("mouseout", function(ev) {
+              layer.closeTooltip();
+            });
+            layer.bindPopup(`${layer.feature.properties.Location}<br/>Cases:<br/>Tests:`);
+          });
+          
           Shiny.addCustomMessageHandler("updateColors", 
             function(aggregated) {
               countyLayer.eachLayer(function(layer) {
@@ -451,6 +464,7 @@ server <- function(input, output, session) {
                 }
               });
           });
+          
           countyLayer.addTo(this);
         }
       ', data = read_file("our_data/US/counties.json"))
@@ -467,7 +481,6 @@ server <- function(input, output, session) {
     setkey(aggregated, Location)
     
     pal = colorBin(colorRamp(c("#ffff00", "#ff0000")), domain = c(0:1), bins = 20)
-    print(log10(aggregated$Tests) / log10(MAX_TESTS))
     
     if (input$markers == "Tests") {
       aggregated[, Markers := pal(log10(Tests)/log10(MAX_TESTS))]
@@ -573,3 +586,4 @@ server <- function(input, output, session) {
 }
 
 shinyApp(ui, server)
+
