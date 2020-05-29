@@ -62,14 +62,11 @@ body <- dashboardBody(
               )
             ),
             fluidRow(
-              column(4,
-                     plotOutput("logisticCurve")
+              column(4, plotOutput("logisticCurve")
               ),
-              column(4,
-                     plotOutput("posAge")
+              column(4, plotOutput("posAge")
               ),
-              column(4,
-                     plotOutput("posRace")
+              column(4, plotOutput("posRace")
               )
             )
     ),
@@ -93,9 +90,9 @@ body <- dashboardBody(
                               choices = c("Tested", "Positive")
                   ),
                   sliderInput("bins",
-                              "Number of bins:",
+                              "Bin width:",
                               min = 1,
-                              max = 20,
+                              max = 10,
                               value = 30
                   ),
                   radioButtons("Graph1", "Display data type", choices = c("Counts", "Freq")),
@@ -176,7 +173,7 @@ server <- function(input, output, session) {
   )
   
   # TODO: handle the fact that county names are fucked, and that state names are reproduced
-  agg <- obs[, .(Tests = length(Positive), Positive = sum(Positive)), by = .(Age)]
+  agg <- obs[, .(Tests = length(Positive), Positive = sum(Positive), State = State), by = .(Age)]
   agg1 <- obs[, .(Tests = length(Positive), Positive = sum(Positive), Race = Race), by = .(Race)]
   agg2 <- obs[, .(Tests = length(Positive), Age = Age, Positive = sum(Positive)), by = .(State)]
   morbs <- comorbs[, .(Child = CHILDREN, Adult=ADULTS, Condition = CONDITION, percentChild=CHILDRENPERCENT, percentAdult = ADULTSPERCENT, totalCount = CHILDREN+ADULTS), by = .(CONDITION)]
@@ -192,82 +189,77 @@ server <- function(input, output, session) {
   
   RacePos<-agg1[, Positive]
   RaceTest <- agg1[, Tests]
-  
-  #locPos <- obs[State == State & Positive & length(Positive)] #positive cases
-  #locTest <- obs[State == State & length(Positive)] #tested cases
-  observeEvent(input$location1, {
-    #locPos <- obs[State == State & Positive, by = .(Age)] #positive cases
-    locTests<-obs[State == State & length(Positive), .(Tests = length(Positive), Positive = sum(Positive)), by = .(Age)]
-    locPos <- obs[State == State & Positive] #positive cases
-    #locTests<-obs[State == State & length(Positive)]
-    
+
+  observeEvent(c(input$location1, input$State1, input$Graph1), {
     output$myhist <- renderPlot({
-      bins<-seq(min(agg$Age), max(agg$Age), length.out = input$bins +1)
-        #ggplot(locPos, aes(Age)) +geom_histogram(bins = 5) +theme_minimal()
-        #ggplot(agg2, aes(Tests)) +geom_histogram(bins = 5) +theme_minimal()
-      if(input$State1 == "Tested" && input$Graph1 =="Counts"){
-        ylim<-c(0,1.2*max(agg$Tests))
-        ylim<-c(0,20)
-        #hist(agg$Age, freq=agg$Tests, col=rainbow(length(agg$Tests)), breaks = bins, main = "Tests by Age", xlab="Age", labels= TRUE, ylim=ylim, panel.first = grid(lty= "solid"))
-        hist(locTests, freq=agg$Tests, col=rainbow(length(agg$Tests)), breaks = bins, main = "Tests by Age", xlab="Age", labels= TRUE, ylim=ylim, panel.first = grid(lty= "solid"))
-        #ggplot(locTests, aes(Age)) +geom_histogram(bins = bins) +theme_minimal()
-      }
-      
-      if(input$State1 == "Positive" && input$Graph1 =="Counts"){
-        ylim<-c(0,1.2*max(agg$Positive))
-        ylim<-c(0,12)
-        #hist(agg$Age, freq=agg$Positive, breaks = bins, col=rainbow(length(agg$Positive)),  main = "Cases by Age", xlab="Age", labels = TRUE, ylim=ylim, panel.first = grid(lty= "solid"))
-        hist(locPos, freq=agg$Positive, breaks = bins, col=viridis(length(agg$Positive)),  main = "Cases by Age", xlab="Age", labels = TRUE, ylim=ylim, panel.first = grid(lty= "solid"))
-      }
-      
-      if(input$State1 == "Tested" && input$Graph1 =="Freq"){
-        PlotRelativeFrequency(hist(agg$Age, freq=agg$Tests, breaks = bins, col=viridis(length(agg$Age)), main = "Relative Frequency of Tests by Age", xlab="Age", ylab= "Freq of tests", labels=TRUE, plot=F, panel.first = grid(lty= "solid")))
-        #PlotRelativeFrequency(hist(locTests, freq=agg$Tests, breaks = bins, col=rainbow(length(agg$Age)), main = "Relative Frequency of Tests by Age", xlab="Age", ylab= "Freq of tests", labels=TRUE, plot=F, panel.first = grid(lty= "solid")))
-      }
-      
-      if(input$State1 == "Positive" && input$Graph1 =="Freq"){
-        PlotRelativeFrequency(hist(agg$Age, freq=agg$Positive, breaks = bins, col=viridis(length(agg$Age)), main = "Relative Frequency of Cases by Age", xlab="Age", ylab="Freq of cases", labels=TRUE, plot=F, panel.first = grid(lty= "solid")))
-        #PlotRelativeFrequency(hist(locPos, freq=agg$Positive, breaks = bins, col=rainbow(length(agg$Age)), main = "Relative Frequency of Cases by Age", xlab="Age", ylab="Freq of cases", labels=TRUE, plot=F, panel.first = grid(lty= "solid")))
-      }
+       bins<-input$bins
+       if(input$Graph1=="Counts"){
+         if(input$State1 == "Tested"){
+           loc<-filter(obs, State == input$location1 & length(Positive))
+         }
+         if(input$State1 == "Positive"){
+           loc<-filter(obs, State == input$location1 & Positive)
+         }
+         print(ggplot(loc, aes(x=Age)) + geom_histogram(binwidth=bins))
+       }
+       if(input$Graph1=="Freq"){
+         if(input$State1 == "Tested"){
+           loc<-filter(obs, State == input$location1 & length(Positive))
+         }
+         if(input$State1 == "Positive"){
+           loc<-filter(obs, State == input$location1 & Positive)
+         }
+         
+         print(ggplot(loc, aes(x=Age)) + geom_histogram(aes(y = stat(count) / sum(count)), binwidth=bins))
+       }
     })
   })
   
-  observeEvent(input$location2, {
+  observeEvent(c(input$location2, input$State2, input$Graph2), {
     output$bar <- renderPlot({
-      locPos <- obs[State == State & Positive] #positive cases
-      locTests <- obs[State == State & length(Positive)]
-      #ggplot(locPos, aes(Race)) +
-      #geom_bar() +
-      #theme_minimal()
-      
-      if(input$State2 == "Tested" && input$Graph2 =="Counts"){
-        ylim<-c(0,1.2*max(RaceTest))
-        #xx<- barplot(RaceTest, main = "Tests per Race", col=rainbow(length(RaceTest)),ylab= "Count", xlab="Races", ylim=ylim, names.arg=c("Black", "White", "Asian"), panel.first = grid(lty= "solid"))
-        xx<- barplot(RaceTest, main = "Tests per Race", ylab= "Count", xlab="Races", ylim=ylim, names.arg=c(agg1$Race), density=c(5,10,20,30,7) , angle=c(0,45,90,11,36) , col="azure4")
-        
-        text(x = xx, y = RaceTest, label = RaceTest, pos = 3, cex = 0.8)
+      if(input$Graph2=="Counts"){
+        if(input$State1 == "Tested"){
+          loc<-filter(obs, State == input$location2 & length(Positive))
+        }
+        if(input$State2 == "Positive"){
+          loc<-filter(obs, State == input$location2 & Positive)
+        }
+        print(ggplot(loc, aes(x=Race)) + geom_bar() +theme_minimal())
       }
-      if(input$State2 == "Positive" && input$Graph2 =="Counts"){
-        ylim<-c(0,1.2*max(RacePos))
-        xx<- barplot(RacePos, main ="Cases per Race", ylab= "Count", xlab="Races", ylim=ylim, names.arg=c(agg1$Race), density=c(5,10,20,30,7) , angle=c(0,45,90,11,36) , col="azure4")
-        text(x = xx, y = RacePos, label = RacePos, pos = 3, cex = 0.8)
+      if(input$Graph2=="Freq"){
+        if(input$State2 == "Tested"){
+          loc<-filter(obs, State == input$location2 & length(Positive))
+        }
+        if(input$State2 == "Positive"){
+          loc<-filter(obs, State == input$location2 & Positive)
+          
+        }
+        Race = loc$Race
+        blank_theme <- theme_minimal()+
+          theme(
+            axis.title.x = element_blank(),
+            axis.title.y = element_blank(),
+            panel.border = element_blank(),
+            panel.grid=element_blank(),
+            axis.ticks = element_blank(),
+            plot.title=element_text(size=14, face="bold")
+          )
+        print(ggplot(loc, aes(x="", fill=Race))+
+          geom_bar(width = 1)+
+          coord_polar("y") + scale_fill_brewer(palette="Blues")+
+            blank_theme + theme(axis.text.x=element_blank() +
+            geom_text(label = paste0(Race, " ", round(stat(count)/ sum(count) * 100, 1), "%"), size=5))
+            
+        )
       }
-      if(input$State2 == "Tested" && input$Graph2 =="Freq"){
-        slices <- c(RaceTest)
-        lbls <- c(agg1$Race)
-        pct <- round(slices/sum(slices)*100)
-        lbls <- paste(lbls, pct) # add percents to labels
-        lbls <- paste(lbls,"%",sep="") # ad % to labels
-        pie(slices,labels = lbls, col=c("azure", "azure3", "azure4"), main="Tests Given by Race")
-      }
-      if(input$State2 == "Positive" && input$Graph2 =="Freq"){
-        slices <- c(RacePos)
-        lbls <- c(agg1$Race)
-        pct <- round(slices/sum(slices)*100)
-        lbls <- paste(lbls, pct) # add percents to labels
-        lbls <- paste(lbls,"%",sep="") # ad % to labels
-        pie(slices,labels = lbls, col=c("azure", "azure3", "azure4"), main="Cases by Race")
-      }
+      # if(input$State2 == "Positive" && input$Graph2 =="Freq"){
+      #   slices <- c(RacePos)
+      #   lbls <- c(agg1$Race)
+      #   pct <- round(slices/sum(slices)*100)
+      #   lbls <- paste(lbls, pct) # add percents to labels
+      #   lbls <- paste(lbls,"%",sep="") # ad % to labels
+      #   pie(slices,labels = lbls, col=c("azure", "azure3", "azure4"), main="Cases by Race")
+      # }
     })
   })
   
@@ -281,7 +273,6 @@ server <- function(input, output, session) {
     class = "display nowrap compact", # style
     filter = "top" # location of column filters
   )
-  
   output$cobar <- renderPlot({
     if(input$State3 == "All" && input$Graph3 =="Counts" ){
       par(mar=c(8,4,4,1)+.1) #bottom, left, top, right margins
@@ -389,7 +380,6 @@ server <- function(input, output, session) {
         }
       ', data = read_file("our_data/US/counties.json"))
   })
-
   observeEvent(c(input$time, input$markers), {
     unixTime <- as.numeric(input$time)
     if (unixTime == 0) {
@@ -399,9 +389,7 @@ server <- function(input, output, session) {
     aggregated <- obs[Updated < unixTime, .(Tests = length(Positive), Positive = sum(Positive)), by = .(County, State)]
     aggregated[, Location := paste0(County, ", ", State)]
     setkey(aggregated, Location)
-    
     pal = colorBin(colorRamp(c("#ffff00", "#ff0000")), domain = c(0:1), bins = 20)
-    
     if (input$markers == "Tests") {
       aggregated[, Markers := pal(log10(Tests)/log10(MAX_TESTS))]
     }
@@ -412,7 +400,6 @@ server <- function(input, output, session) {
     if (input$markers == "Cases Per Capita") {
       aggregated[, Markers := pal(Tests)]
     }
-    
     session$sendCustomMessage(type = "updateColors", aggregated)
   })
   
@@ -467,7 +454,6 @@ server <- function(input, output, session) {
         scale_x_continuous(name = "Date", labels = function(x) {as.Date(as.POSIXct(x, origin = "1970-01-01"))})
     })
   })
-  
   # observeEvent(input$counties, {
   #   groupToShow = "population"
   #   
@@ -488,6 +474,5 @@ server <- function(input, output, session) {
   #     showGroup(groupToShow)
   # })
 }
-
 shinyApp(ui, server)
 
