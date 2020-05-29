@@ -218,7 +218,7 @@ server <- function(input, output, session) {
   observeEvent(c(input$location2, input$State2, input$Graph2), {
     output$bar <- renderPlot({
       if(input$Graph2=="Counts"){
-        if(input$State1 == "Tested"){
+        if(input$State2 == "Tested"){
           loc<-filter(obs, State == input$location2 & length(Positive))
         }
         if(input$State2 == "Positive"){
