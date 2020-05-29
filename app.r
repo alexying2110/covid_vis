@@ -146,8 +146,15 @@ beds <- fread("our_data/US/beds.csv", key = "Location")
 # TODO: have to clean the fucking beds dt jfc
 
 server <- function(input, output, session) {
-  # invalidateLater(5 * 60 * 1000, session)
-  obs <- fread("our_data/test/test.csv")
+  runjs("
+    function reload_page() {
+      window.location.reload()
+      setTimeout(reload_page, 60 * 1000)
+    }
+    setTimeout(reload_page, 60 * 1000)
+  ")
+  
+  obs<- fread("our_data/test/test.csv")
   obs[, Location := paste0(County, ", ", State)]
   allAggregated <- obs[, .(Tests = length(Positive), Positive = sum(Positive)), by = .(County, State, Location)]
   MAX_TESTS <- max(allAggregated$Tests)
@@ -160,6 +167,7 @@ server <- function(input, output, session) {
     replace(., is.na(.), 0) %>%
     structure(., names = as.character(counties$Location)) %>%
     toJSON()
+  output$plotHeader <- renderText({"Click on a county to view graphs"})
   
   #age and comorbidity
   comorbs <- fread("our_data/US/Medical_Conditions.csv")
@@ -515,6 +523,8 @@ server <- function(input, output, session) {
       
       locationObs <- obs[County == id[1] & State == id[2] & Positive]
       
+      output$plotHeader <- renderText({input$map_shape_click$id})
+      
       output$posRace <- renderPlot({
         ggplot(locationObs, aes(Race)) + 
           geom_bar() + 
@@ -538,10 +548,8 @@ server <- function(input, output, session) {
           scale_y_continuous(name = "Number of Cases") +
           scale_x_continuous(name = "Date", labels = function(x) {as.Date(as.POSIXct(x, origin = "1970-01-01"))})
       })
-      
-      output$plotHeader <- renderText({""})
     } else {
-      output$plotHeader <- renderText({"No cases in this county"})
+      output$plotHeader <- renderText({paste0("No cases in ", input$map_shape_click$id)})
       output$posRace <- NULL
       output$posAge <- NULL
       output$logisticCurve <- NULL
