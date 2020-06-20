@@ -20,6 +20,9 @@ library(ggplot2)
 library(viridis)
 library(usmap)
 
+
+# Sets directory for relative paths. one line is for use on the EC2 instance, the other is my laptop. 
+# plz don't make fun of my username
 # setwd("/home/ubuntu/covid_vis")
 #setwd("/home/lofatdairy/code/sialab/covid_vis")
 
@@ -29,9 +32,11 @@ library(usmap)
 # pop[Location := paste0(unlist(strsplit(CTYNAME, " County")), ", ", STNAME)]
 # setkey(pop, Location)
 
+#data for states
 states<-fread("our_data/test/test.csv")
 
 sidebar <- dashboardSidebar(
+  #these are the dashboard tabs
   sidebarMenu(
     menuItem("Dashboard", tabName = "maps", icon = icon("dashboard")),
     menuItem("Graphs", tabName = "graphs", icon = icon("th")),
@@ -47,6 +52,7 @@ body <- dashboardBody(
             fluidRow(
               useShinyjs(),
              sidebarPanel(
+               #time slider
                 sliderInput("time", 
                           label = h3("Time"), 
                           min = 0, 
@@ -90,15 +96,18 @@ body <- dashboardBody(
             #       ),
             fluidRow(
               column(width=6,
+                     #table of age/race data
                      DTOutput('table'),
                      
                      br(),br(),br(),
+                     #filters for the bar graph
                      plotOutput(outputId = "bar"),
                      selectInput("State2", "Select a field to create bar graph by race", choices = c("Tested", "Positive")),
                      radioButtons("Graph2", "Display data type", choices = c("Counts", "Freq")),
                      selectInput(inputId = "location2", label = ("Location to Filter by"), choices = unique(states$State)),
                      
                      br(),br(),br(),
+                     #histogram of ages of positive cases
                      plotOutput(outputId = "myhist"),
                     
                      selectInput("State1", "Select a field to create histogram by age", choices = c("Tested", "Positive")),
@@ -108,12 +117,14 @@ body <- dashboardBody(
                     
               ),
               column(width=6, 
+                     #table of comorbidities
                      DTOutput('table1'),
                      
                      br(),br(),br(),
                      
                      plotOutput(outputId = "cobar"),
                     
+                     #comorbidity data
                      selectInput("State3",  "Comorbidity data", choices = list("All", "All-Stacked", "Pediatric", "Adult")),
                      radioButtons("Graph3", "Display data type", choices = c("Counts", "Freq")),
                      selectInput(inputId = "location3", label = ("Location to Filter by"), choices = unique(states$State)),
@@ -129,7 +140,7 @@ body <- dashboardBody(
               )
             ),
           
-            
+            #ignore this, it's another format for page 2, don't delete
             # fluidRow(
             #     titlePanel("    Distributions"),
             #     fluidPage(
@@ -228,7 +239,7 @@ body <- dashboardBody(
            #infoBox("Total Cases", "633", icon = icon("credit-card"), fill = TRUE),
            # Dynamic infoBoxes
            infoBoxOutput("cases"),
-           infoBoxOutput("progressBox"),
+           infoBoxOutput("progressBox"), 
            infoBoxOutput("progressBox1"),
            infoBoxOutput("approvalBox")
 
@@ -237,6 +248,7 @@ body <- dashboardBody(
   )
 )
 
+# Note here that any additional graphs, buttons, etc must be added to ui, which just holds a fluid page object
 ui <- dashboardPage( 
   skin="blue",
   dashboardHeader(title = "Covid-19 Dashboard"),
@@ -244,13 +256,26 @@ ui <- dashboardPage(
   body
 )
 
+# Reads in the geojson describing the county boundaries. This gives leaflet a set of points for each county that
+# describes the county's border. you can think of counties as actually a dictionary with 7 key-value pairs, the 
+# value of each field each being a vector. the most important fields for our use are NAME and STATENAME, 
+# which are the county's name and the state's name, respectively.
+# A side note: the reason that counties is declared outside the server function is that this allows for its
+# value to be cached, so we don't have to read the big ass json file each time the shiny app is started.
 counties <- readOGR("our_data/US/counties.json")
 countyCenters <- fread("our_data/US/county_centers.csv", key = "Location")
 beds <- fread("our_data/US/beds.csv", key = "Location")
 #comorbidities <- fread("our_data/US/counties.json")
 
 # TODO: have to clean the fucking beds dt jfc
+# This server function handles the data logic, and is run every time a user opens the app. Note that in R,
+# returns are not required to be explicit, and in this case, the output variable is actually what is acessed
+# by shiny to determine what is drawn on the UI. That means that we append any graphs, maps, figures, etc, onto
+# output.
 server <- function(input, output, session) {
+  # obs is a data.table object (just like pandas data frames if you're familiar with that), with each
+  # observation being a single test taken. each observation is the county, state, lat, long, outcome (positive or negative)
+  # update time, race, hispanic, and age of the user/test.
   obs <- fread("our_data/test/test.csv")
   maxObs <- obs[, .(Tests = length(Positive), Positive = sum(Positive)), by = .(County, State)]
   MAX_TESTS <- max(maxObs$Tests)
@@ -354,20 +379,12 @@ server <- function(input, output, session) {
           coord_polar("y") + scale_fill_brewer(palette="Blues")+
             blank_theme + theme(axis.text.x=element_blank() +
             geom_text(label = paste0(Race, " ", round(stat(count)/ sum(count) * 100, 1), "%"), size=5))
-            
         )
       }
-      # if(input$State2 == "Positive" && input$Graph2 =="Freq"){
-      #   slices <- c(RacePos)
-      #   lbls <- c(agg1$Race)
-      #   pct <- round(slices/sum(slices)*100)
-      #   lbls <- paste(lbls, pct) # add percents to labels
-      #   lbls <- paste(lbls,"%",sep="") # ad % to labels
-      #   pie(slices,labels = lbls, col=c("azure", "azure3", "azure4"), main="Cases by Race")
-      # }
     })
   })
   
+  #FIXXXX, these should change based on state, I have it hardcoded in right now
   observeEvent(c(input$location3), {
     output$cases <- renderInfoBox({
       loc<-filter(obs, State == input$location1 & length(Positive))
@@ -482,32 +499,8 @@ server <- function(input, output, session) {
     abline(lm(mpg~wt, data = mtcars))
   })
   
-  # output$cases <- renderInfoBox({
-  #   infoBox(
-  #     "Total Cases", "633", icon = icon("credit-card"), fill = TRUE
-  #   )
-  # })
-  # output$progressBox <- renderInfoBox({
-  #   infoBox(
-  #     "Residents", "610", icon = icon("list"),
-  #     color = "purple"
-  #   )
-  # })
-  # output$progressBox1 <- renderInfoBox({
-  #   infoBox(
-  #     "Non-Residents", "23", icon = icon("list"),
-  #     color = "purple"
-  #   )
-  # })
-  # output$approvalBox <- renderInfoBox({
-  #   infoBox(
-  #     "Hospitalizations", "80", icon = icon("thumbs-up", lib = "glyphicon"),
-  #     color = "yellow"
-  #   )
-  # })
-
+  #map for the third page
   output$map1 <- renderLeaflet({
-    
     leaflet(counties) %>%
       addProviderTiles(providers$CartoDB.DarkMatterNoLabels) %>%
       setView(lng = -97, lat = 39, zoom = 3) %>%
@@ -528,6 +521,7 @@ server <- function(input, output, session) {
       ', data = read_file("our_data/US/counties.json"))
   })
   
+  # To the output object, we add the map key, and assign it a leaflet map.
   output$map <- renderLeaflet({
     leaflet(counties) %>%
       addProviderTiles(providers$CartoDB.DarkMatterNoLabels) %>%
@@ -580,9 +574,21 @@ server <- function(input, output, session) {
       return(NULL)
     }
     
+    # aggregated is basically taking all the observations in obs, and grouping them by state and county (some county
+    # names are the same in different states, so we use both). For example, if there are 100 observations in LA, California,
+    # and 50 are positive, then the aggregated table will look like this:
+    # County, State, Tests, Positive, Location
+    # Los Angeles, California, 100, 50, "Los Angeles, California"
+    # Note that Location is basically the combination of county and state name (again because county name is not unique)
+    # to generate a unique string, and then location is made the key for the data.table, basically turning it into a hash
+    # map. This is important later, because we have to map number of tests and number of cases to each county for the 
+    # counties dictionary, and this lets us accomplish that quickly and concisely
     aggregated <- obs[Updated < unixTime, .(Tests = length(Positive), Positive = sum(Positive)), by = .(County, State)]
     aggregated[, Location := paste0(County, ", ", State)]
     setkey(aggregated, Location)
+    # pal is a function that reads in a vector of numbers, and returns a color. domain being NULL basically means
+    # generate the domain from the highest and lowest value in that vector. bins = 10 means that 10 different colors
+    # are created from the colorRamp, which is just a gradient from yellow to red
     pal = colorBin(colorRamp(c("#ffff00", "#ff0000")), domain = c(0:1), bins = 20)
     if (input$markers == "Tests") {
       aggregated[, Markers := pal(log10(Tests)/log10(MAX_TESTS))]
@@ -597,6 +603,7 @@ server <- function(input, output, session) {
     session$sendCustomMessage(type = "updateColors", aggregated)
   })
   
+  #updates the graphs on page 1 based on county location, upon map click
   observeEvent(input$map_shape_click, {
     id <- strsplit(input$map_shape_click$id, ", ")[[1]]
     locationObs <- obs[County == id[1] & State == id[2] & Positive]
