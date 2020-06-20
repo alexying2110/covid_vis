@@ -18,6 +18,7 @@ library(HistogramTools)
 library(shinyWidgets)
 library(ggplot2)
 library(viridis)
+library(usmap)
 
 # setwd("/home/ubuntu/covid_vis")
 #setwd("/home/lofatdairy/code/sialab/covid_vis")
@@ -34,6 +35,7 @@ sidebar <- dashboardSidebar(
   sidebarMenu(
     menuItem("Dashboard", tabName = "maps", icon = icon("dashboard")),
     menuItem("Graphs", tabName = "graphs", icon = icon("th")),
+    menuItem("Case Summary", tabName = "data", icon = icon("th")),
     width = 230
   )
 )
@@ -44,7 +46,7 @@ body <- dashboardBody(
             titlePanel("    Map"),
             fluidRow(
               useShinyjs(),
-              sidebarPanel(
+             sidebarPanel(
                 sliderInput("time", 
                           label = h3("Time"), 
                           min = 0, 
@@ -72,90 +74,169 @@ body <- dashboardBody(
     ),
     #second tab
     tabItem(tabName = "graphs",
+            titlePanel("    Distributions"),
+            # fluidRow(
+            #   column(width = 12,
+            #          
+            #       tabBox(
+            #         id = "tabset1", height = "250px",
+            #         tabPanel("Tab1",
+            #           DTOutput('table'),
+            #         ),
+            #         tabPanel("Tab2",
+            #           DTOutput('table1'),
+            #         )
+            #       ))
+            #       ),
             fluidRow(
-                titlePanel("Distributions"),
-                fluidPage(
-                  fluidRow(
-                    column(6, DTOutput('table')
-                    ),
-                    column(6, DTOutput('table1')
-                    )
-                  )
-                ),
-              sidebarPanel(
-                fluidPage(
-                  br(),
-                  selectInput("State1", 
-                              "Select a field to create histogram by age",
-                              choices = c("Tested", "Positive")
-                  ),
-                  sliderInput("bins",
-                              "Bin width:",
-                              min = 1,
-                              max = 10,
-                              value = 30
-                  ),
-                  radioButtons("Graph1", "Display data type", choices = c("Counts", "Freq")),
-                  selectInput(inputId = "location1", label = ("Location to Filter by"),
-                              choices = unique(states$State)
-                  ),
-                  br(), br(),br(),br(), br(), br(),
-                  selectInput("State2", 
-                              "Select a field to create bar graph by race",
-                              choices = c("Tested", "Positive")
-                  ),
-                  radioButtons("Graph2", "Display data type", choices = c("Counts", "Freq")),
-                  selectInput(inputId = "location2", label = ("Location to Filter by"),
-                              choices = unique(states$State)
-                  ),
-                  br(),br(),br(),br(),br(),br(),br(),br(),br(),
-                  selectInput("State3", 
-                      "Comorbidity data", 
-                      choices = list("All", "All-Stacked", "Pediatric", "Adult"),
-                  ),
-                  radioButtons("Graph3", "Display data type", choices = c("Counts", "Freq")),
-                  selectInput(inputId = "location3", label = ("Location to Filter by"),
-                              choices = unique(states$State)
-                  ),
-                  br(),br(),br(),br(),br(),br(),br(),br(),br(),
-                  selectInput("State4",
-                              "Days after exposure",
-                              choices = list("1 day", "5 days", "10 days", "1 week", "2 weeks"),
-                  ),
-                  radioButtons("Graph4", "View", choices = c("Line", "Bar")),
-                  selectInput(inputId = "symp", label = ("Symptom to display"),
-                              choices = c("All", "Fever", "Cough", "Diarrhea", "Body Aches")
-                  ),
-                  
-                  # br(),br(),br(),br(),br(),br(),br(),br(),br(),
-                  # selectInput("State5", 
-                  #             "Comorbidity data", 
-                  #             choices = list("All", "All-Stacked", "Pediatric", "Adult"),
-                  # ),
-                  # radioButtons("Graph5", "Display data type", choices = c("Counts", "Freq")),
-                  # selectInput(inputId = "location5", label = ("Location to Filter by"),
-                  #             choices = unique(states$State)
-                  # ),
-                  br(),br(),br()
-                )
+              column(width=6,
+                     DTOutput('table'),
+                     
+                     br(),br(),br(),
+                     plotOutput(outputId = "bar"),
+                     selectInput("State2", "Select a field to create bar graph by race", choices = c("Tested", "Positive")),
+                     radioButtons("Graph2", "Display data type", choices = c("Counts", "Freq")),
+                     selectInput(inputId = "location2", label = ("Location to Filter by"), choices = unique(states$State)),
+                     
+                     br(),br(),br(),
+                     plotOutput(outputId = "myhist"),
+                    
+                     selectInput("State1", "Select a field to create histogram by age", choices = c("Tested", "Positive")),
+                     sliderInput("bins", "Bin width:", min = 1, max = 10, value = 30),
+                     radioButtons("Graph1", "Display data type", choices = c("Counts", "Freq")),
+                     selectInput(inputId = "location1", label = ("Location to Filter by"), choices = unique(states$State)),  
+                    
               ),
-              mainPanel(
-                fluidPage(
-                  plotOutput(outputId = "myhist"),
-                  br(),
-                  plotOutput(outputId = "bar"),
-                  br(),
-                  plotOutput(outputId = "cobar"),
-                  br(),
-                  plotOutput(outputId = "symptoms"),
-                  # br(),
-                  # plotOutput(outputId = "line"),
-                )
+              column(width=6, 
+                     DTOutput('table1'),
+                     
+                     br(),br(),br(),
+                     
+                     plotOutput(outputId = "cobar"),
+                    
+                     selectInput("State3",  "Comorbidity data", choices = list("All", "All-Stacked", "Pediatric", "Adult")),
+                     radioButtons("Graph3", "Display data type", choices = c("Counts", "Freq")),
+                     selectInput(inputId = "location3", label = ("Location to Filter by"), choices = unique(states$State)),
+                    
+                     br(),br(),br(),
+                     plotOutput(outputId = "symptoms"),
+                    
+                     selectInput("State4", "Days after exposure", choices = list("1 day", "5 days", "10 days", "1 week", "2 weeks")),
+                     radioButtons("Graph4", "View", choices = c("Line", "Bar")),
+                     selectInput(inputId = "symp", label = ("Symptom to display"),choices = c("All", "Fever", "Cough", "Diarrhea", "Body Aches")),
+                     
+                     
               )
-         )
-    )
+            ),
+          
+            
+            # fluidRow(
+            #     titlePanel("    Distributions"),
+            #     fluidPage(
+            #       fluidRow(
+            #         column(6, DTOutput('table')
+            #         ),
+            #         column(6, DTOutput('table1')
+            #         )
+            #       )
+            #     ),
+            #   sidebarPanel(
+            #     fluidPage(
+            #       br(),
+            #       selectInput("State1", 
+            #                   "Select a field to create histogram by age",
+            #                   choices = c("Tested", "Positive")
+            #       ),
+            #       sliderInput("bins",
+            #                   "Bin width:",
+            #                   min = 1,
+            #                   max = 10,
+            #                   value = 30
+            #       ),
+            #       radioButtons("Graph1", "Display data type", choices = c("Counts", "Freq")),
+            #       selectInput(inputId = "location1", label = ("Location to Filter by"),
+            #                   choices = unique(states$State)
+            #       ),
+            #       br(), br(),br(),br(), br(), br(),
+            #       selectInput("State2", 
+            #                   "Select a field to create bar graph by race",
+            #                   choices = c("Tested", "Positive")
+            #       ),
+            #       radioButtons("Graph2", "Display data type", choices = c("Counts", "Freq")),
+            #       selectInput(inputId = "location2", label = ("Location to Filter by"),
+            #                   choices = unique(states$State)
+            #       ),
+            #       br(),br(),br(),br(),br(),br(),br(),br(),br(),
+            #       selectInput("State3", 
+            #           "Comorbidity data", 
+            #           choices = list("All", "All-Stacked", "Pediatric", "Adult"),
+            #       ),
+            #       radioButtons("Graph3", "Display data type", choices = c("Counts", "Freq")),
+            #       selectInput(inputId = "location3", label = ("Location to Filter by"),
+            #                   choices = unique(states$State)
+            #       ),
+            #       br(),br(),br(),br(),br(),br(),br(),br(),br(),
+            #       selectInput("State4",
+            #                   "Days after exposure",
+            #                   choices = list("1 day", "5 days", "10 days", "1 week", "2 weeks"),
+            #       ),
+            #       radioButtons("Graph4", "View", choices = c("Line", "Bar")),
+            #       selectInput(inputId = "symp", label = ("Symptom to display"),
+            #                   choices = c("All", "Fever", "Cough", "Diarrhea", "Body Aches")
+            #       ),
+            #       
+            #       # br(),br(),br(),br(),br(),br(),br(),br(),br(),
+            #       # selectInput("State5", 
+            #       #             "Comorbidity data", 
+            #       #             choices = list("All", "All-Stacked", "Pediatric", "Adult"),
+            #       # ),
+            #       # radioButtons("Graph5", "Display data type", choices = c("Counts", "Freq")),
+            #       # selectInput(inputId = "location5", label = ("Location to Filter by"),
+            #       #             choices = unique(states$State)
+            #       # ),
+            #       br(),br(),br()
+            #     )
+              #),
+              # mainPanel(
+              #   fluidPage(
+              #     plotOutput(outputId = "myhist"),
+              #     br(),
+              #     plotOutput(outputId = "bar"),
+              #     br(),
+              #     plotOutput(outputId = "cobar"),
+              #     br(),
+              #     plotOutput(outputId = "symptoms"),
+              #     # br(),
+              #     # plotOutput(outputId = "line"),
+              #   )
+              # )
+         #)
+    ),
+   #add back here
+   #third tab
+   tabItem(tabName = "data",
+           titlePanel("    Case Summary"),
+           leafletOutput(outputId = "map1"),
+           br(),
+           sidebarPanel(
+             fluidRow(
+               selectInput(inputId = "location4", label = ("Location to Filter by"),
+                           choices = unique(states$State)
+               )
+             )
+           ),
+           #infoBox("Total Cases", "633", icon = icon("credit-card"), fill = TRUE),
+           # Dynamic infoBoxes
+           infoBoxOutput("cases"),
+           infoBoxOutput("progressBox"),
+           infoBoxOutput("progressBox1"),
+           infoBoxOutput("approvalBox")
+
+           
+   )
   )
 )
+
 ui <- dashboardPage( 
   skin="blue",
   dashboardHeader(title = "Covid-19 Dashboard"),
@@ -238,6 +319,7 @@ server <- function(input, output, session) {
     })
   })
   
+  
   observeEvent(c(input$location2, input$State2, input$Graph2), {
     output$bar <- renderPlot({
       if(input$Graph2=="Counts"){
@@ -285,6 +367,34 @@ server <- function(input, output, session) {
       # }
     })
   })
+  
+  observeEvent(c(input$location3), {
+    output$cases <- renderInfoBox({
+      loc<-filter(obs, State == input$location1 & length(Positive))
+      infoBox(
+        "Total Cases", "633", icon = icon("credit-card"), fill = TRUE
+      )
+    })
+    output$progressBox <- renderInfoBox({
+      infoBox(
+        "Residents", "610", icon = icon("list"),
+        color = "purple"
+      )
+    })
+    output$progressBox1 <- renderInfoBox({
+      infoBox(
+        "Non-Residents", "23", icon = icon("list"),
+        color = "purple"
+      )
+    })
+    output$approvalBox <- renderInfoBox({
+      infoBox(
+        "Hospitalizations", "80", icon = icon("thumbs-up", lib = "glyphicon"),
+        color = "yellow"
+      )
+    })
+  })
+  
   
   output$table <- renderDT(
     obs %>% select(2, 7, 9, 5),
@@ -372,7 +482,52 @@ server <- function(input, output, session) {
     abline(lm(mpg~wt, data = mtcars))
   })
   
+  # output$cases <- renderInfoBox({
+  #   infoBox(
+  #     "Total Cases", "633", icon = icon("credit-card"), fill = TRUE
+  #   )
+  # })
+  # output$progressBox <- renderInfoBox({
+  #   infoBox(
+  #     "Residents", "610", icon = icon("list"),
+  #     color = "purple"
+  #   )
+  # })
+  # output$progressBox1 <- renderInfoBox({
+  #   infoBox(
+  #     "Non-Residents", "23", icon = icon("list"),
+  #     color = "purple"
+  #   )
+  # })
+  # output$approvalBox <- renderInfoBox({
+  #   infoBox(
+  #     "Hospitalizations", "80", icon = icon("thumbs-up", lib = "glyphicon"),
+  #     color = "yellow"
+  #   )
+  # })
 
+  output$map1 <- renderLeaflet({
+    
+    leaflet(counties) %>%
+      addProviderTiles(providers$CartoDB.DarkMatterNoLabels) %>%
+      setView(lng = -97, lat = 39, zoom = 3) %>%
+      onRender('
+        function(el, x, data) {
+          let geoObj = JSON.parse(data);
+          let counties = geoObj.features;
+          countyLayer = L.geoJSON(counties, {
+            style: {
+              weight: 0.5,
+              opacity: 0.7,
+              fillOpacity: 0.5
+            }
+          });
+          
+          countyLayer.addTo(this);
+        }
+      ', data = read_file("our_data/US/counties.json"))
+  })
+  
   output$map <- renderLeaflet({
     leaflet(counties) %>%
       addProviderTiles(providers$CartoDB.DarkMatterNoLabels) %>%
