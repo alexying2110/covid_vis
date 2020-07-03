@@ -234,19 +234,20 @@ server <- function(input, output, session) {
        bins<-input$bins
        if(input$Graph1=="Counts"){
          if(input$State1 == "Tested"){
-           loc<-filter(obs, State == input$location & length(Positive))
+           #loc<-filter(obs, State == input$location & length(Positive))
+           loc<-filter(obs, State %in% input$location & length(Positive))
          }
          if(input$State1 == "Positive"){
-           loc<-filter(obs, State == input$location & Positive)
+           loc<-filter(obs, State %in% input$location & Positive)
          }
          print(ggplot(loc, aes(x=Age)) + geom_histogram(binwidth=bins))
        }
        if(input$Graph1=="Freq"){
          if(input$State1 == "Tested"){
-           loc<-filter(obs, State == input$location & length(Positive))
+           loc<-filter(obs, State %in%input$location & length(Positive))
          }
          if(input$State1 == "Positive"){
-           loc<-filter(obs, State == input$location & Positive)
+           loc<-filter(obs, State %in% input$location & Positive)
          }
          
          print(ggplot(loc, aes(x=Age)) + geom_histogram(aes(y = stat(count) / sum(count)), binwidth=bins))
@@ -259,19 +260,19 @@ server <- function(input, output, session) {
     output$bar <- renderPlot({
       if(input$Graph2=="Counts"){
         if(input$State2 == "Tested"){
-          loc<-filter(obs, State == input$location & length(Positive))
+          loc<-filter(obs, State %in% input$location & length(Positive))
         }
         if(input$State2 == "Positive"){
-          loc<-filter(obs, State == input$location & Positive)
+          loc<-filter(obs, State %in% input$location & Positive)
         }
         print(ggplot(loc, aes(x=Race)) + geom_bar() +theme_minimal())
       }
       if(input$Graph2=="Freq"){
         if(input$State2 == "Tested"){
-          loc<-filter(obs, State == input$location & length(Positive))
+          loc<-filter(obs, State %in% input$location & length(Positive))
         }
         if(input$State2 == "Positive"){
-          loc<-filter(obs, State == input$location & Positive)
+          loc<-filter(obs, State %in% input$location & Positive)
           
         }
         Race = loc$Race
